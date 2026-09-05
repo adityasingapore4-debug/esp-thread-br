@@ -29,6 +29,11 @@
 
 #include "border_router_launch.h"
 #include "esp_br_web.h"
+#include "universal_node_gateway.h"
+#include "universal_node_gateway_http_transport.h"
+#include "universal_node_gateway_thread_rx_adapter.h"
+#include "universal_node_gateway_thread_tx_adapter.h"
+#include "address_resolver.h"
 
 #define TAG "esp_ot_br"
 
@@ -100,9 +105,15 @@ void app_main(void)
     esp_set_ota_server_cert((char *)server_cert_pem_start);
 #endif
 
+    ESP_ERROR_CHECK(universal_node_gateway_init());
+    address_runtime_resolver_init();
+    ESP_ERROR_CHECK(universal_node_gateway_thread_tx_adapter_init() ? ESP_OK : ESP_FAIL);
+    ESP_ERROR_CHECK(universal_node_gateway_http_transport_init());
 #if CONFIG_OPENTHREAD_BR_START_WEB
     esp_br_web_start("/spiffs");
 #endif
-
     launch_openthread_border_router(&openthread_config, &rcp_update_config);
+    ESP_ERROR_CHECK(universal_node_gateway_thread_rx_adapter_register(
+        esp_openthread_get_instance()) ? ESP_OK : ESP_FAIL);
+    ESP_ERROR_CHECK(universal_node_gateway_start());
 }

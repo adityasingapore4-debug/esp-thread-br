@@ -45,6 +45,7 @@
 #define SERVER_IPV4_LEN 16
 #define FILE_CHUNK_SIZE 4096
 #define WEB_TAG "obtr_web"
+#define EXTERNAL_URI_HANDLER_CAPACITY 4u
 
 /*-----------------------------------------------------
  Note：Http Server
@@ -68,6 +69,17 @@ typedef struct http_server {
 } http_server_t;
 
 static http_server_t s_server = {NULL, {"", ""}, "", 80}; /* the instance of server */
+static const httpd_uri_t *s_external_uri_handlers[EXTERNAL_URI_HANDLER_CAPACITY];
+static uint8_t s_external_uri_handler_count;
+
+esp_err_t esp_br_web_register_uri_handler(const httpd_uri_t *uri)
+{
+    if (uri == NULL || uri->uri == NULL || uri->handler == NULL) return ESP_ERR_INVALID_ARG;
+    if (s_server.handle != NULL) return ESP_ERR_INVALID_STATE;
+    if (s_external_uri_handler_count >= EXTERNAL_URI_HANDLER_CAPACITY) return ESP_ERR_NO_MEM;
+    s_external_uri_handlers[s_external_uri_handler_count++] = uri;
+    return ESP_OK;
+}
 
 /**
  * @brief The basic parameter definition for parsing url
@@ -1317,7 +1329,8 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path, const cha
     strlcpy(s_server.data.base_path, base_path, ESP_VFS_PATH_MAX + 1);
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
+    config.max_uri_handlers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) +
+                              s_external_uri_handler_count + 2;
     config.max_resp_headers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8 * 1024;
@@ -1337,6 +1350,14 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path, const cha
 
     httpd_server_register_http_uri(&s_server, s_resource_handlers, sizeof(s_resource_handlers) / sizeof(httpd_uri_t));
     httpd_server_register_http_uri(&s_server, s_web_gui_handlers, sizeof(s_web_gui_handlers) / sizeof(httpd_uri_t));
+    for (uint8_t i = 0u; i < s_external_uri_handler_count; ++i) {
+        if (httpd_register_uri_handler(s_server.handle, s_external_uri_handlers[i]) != ESP_OK) {
+            ESP_LOGE(WEB_TAG, "Failed to register external URI %s", s_external_uri_handlers[i]->uri);
+            httpd_stop(s_server.handle);
+            s_server.handle = NULL;
+            return NULL;
+        }
+    }
     httpd_register_uri_handler(s_server.handle, &default_uris_get);
 
     // Show the login address in the console
