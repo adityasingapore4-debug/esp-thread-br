@@ -14,6 +14,7 @@
 #include "mesh_session_control.h"
 #include "node_identity.h"
 #include "security_root.h"
+#include "provisioning_v2.h"
 #include "transport.h"
 #include "address_resolver.h"
 #include "device_event_delivery.h"
@@ -310,6 +311,10 @@ esp_err_t universal_node_gateway_init(void)
     universal_node_gateway_contract_linkage();
     node_identity_init();
     security_root_init();
+    if (!provisioning_v2_init()) {
+        s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;
+        return ESP_FAIL;
+    }
     if (!mesh_auth_init(node_identity_get()) ||
         !mesh_session_init(node_identity_get())) {
         s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;

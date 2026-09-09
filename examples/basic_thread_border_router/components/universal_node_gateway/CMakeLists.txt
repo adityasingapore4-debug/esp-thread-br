@@ -26,5 +26,5 @@ idf_component_register(
                  "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/thread_runtime_resolution/include"
                  "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/mesh_session_control/include"
     PRIV_INCLUDE_DIRS "private_include"
-    REQUIRES freertos esp_common log utils node_identity control_frame mesh_auth mesh_session security_root transport addressing coap_transport openthread esp_wifi esp_http_server esp_ot_br_server
+    REQUIRES freertos esp_common log utils node_identity control_frame mesh_auth mesh_session security_root provisioning_v2 transport addressing coap_transport openthread esp_wifi esp_http_server esp_ot_br_server
 )

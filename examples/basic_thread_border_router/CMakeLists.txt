@@ -11,7 +11,8 @@ set(EXTRA_COMPONENT_DIRS
     "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/control_frame"
     "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/security_root"
     "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/mesh_session"
-    "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/mesh_auth")
+    "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/mesh_auth"
+    "/home/aditya/esp/projects/universal-node-thread-fw/firmware/components/provisioning_v2")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(esp_ot_br)
