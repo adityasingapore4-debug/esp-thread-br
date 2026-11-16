@@ -2,6 +2,11 @@
 # in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.5)
 
+# This ESP32-S3 Gateway board has no physical relay outputs.  The Universal
+# Node board profile remains capability-driven: another Gateway SKU may set a
+# nonzero BOARD_RELAY_COUNT without any Gateway-specific firmware branch.
+add_compile_definitions(BOARD_RELAY_COUNT=0)
+
 set(UN_FIRMWARE_ROOT "/home/aditya/esp/projects/universal-node-thread-fw/firmware")
 
 set(EXTRA_COMPONENT_DIRS
