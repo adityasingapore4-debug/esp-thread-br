@@ -1,0 +1,11 @@
+menu "Universal Node Gateway profile"
+
+config UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
+    bool "Enable Gateway/OTBR product traffic"
+    default n
+    help
+        G1A keeps the canonical Universal Node foundation isolated.  Enabling
+        this starts the existing engineering Gateway HTTP carrier and OTBR
+        runtime; that is outside the G1A profile.
+
+endmenu

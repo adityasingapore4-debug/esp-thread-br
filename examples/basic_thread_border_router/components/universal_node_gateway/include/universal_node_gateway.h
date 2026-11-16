@@ -77,6 +77,9 @@ extern "C" {
 #endif
 
 esp_err_t universal_node_gateway_init(void);
+/* Starts only the canonical BLE provisioning carrier.  Gateway HTTP ingress
+ * and Border Router product services remain outside this lifecycle. */
+esp_err_t universal_node_gateway_start_provisioning_carrier(void);
 esp_err_t universal_node_gateway_start(void);
 esp_err_t universal_node_gateway_stop(void);
 bool universal_node_gateway_is_ready(void);

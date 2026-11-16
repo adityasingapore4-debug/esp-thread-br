@@ -13,11 +13,24 @@
 #include "mesh_session.h"
 #include "mesh_session_control.h"
 #include "node_identity.h"
+#include "manufacturing_identity.h"
 #include "security_root.h"
 #include "provisioning_v2.h"
+#include "join_existing.h"
+#include "ble_bridge.h"
+#include "ble_key_manager.h"
+#include "ble_pairing_policy.h"
+#include "authorization.h"
+#include "command_router.h"
+#include "device_capability.h"
+#include "device_event_bus.h"
+#include "device_event_distributor.h"
 #include "transport.h"
 #include "address_resolver.h"
+#include "device_metadata.h"
 #include "device_event_delivery.h"
+#include "node_registry.h"
+#include "rts.h"
 #include "synchronization_protocol.h"
 #include "universal_node_gateway_pending.h"
 #include "response_transfer_receive_core.h"
@@ -30,6 +43,7 @@ static const char *TAG = "un_gateway";
 
 static bool s_initialized;
 static bool s_started;
+static bool s_provisioning_carrier_started;
 static universal_node_gateway_status_error_t s_last_error =
     UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_NOT_INITIALIZED;
 static bool s_last_submit_valid;
@@ -38,6 +52,34 @@ static universal_node_gateway_rx_consumer_t s_rx_consumer;
 static void *s_rx_consumer_context;
 static universal_node_gateway_response_consumer_t s_response_consumer;
 static void *s_response_consumer_context;
+
+/* G1B composes canonical local services only.  It does not register a
+ * transport ingress, start Thread, or start Registry Sync runtime. */
+static bool universal_node_gateway_local_platform_init(void)
+{
+    if (!device_event_bus_init() || !rts_init()) {
+        return false;
+    }
+
+    device_capability_init();
+    if (!metadata_init() || !device_event_delivery_init() ||
+        !device_event_distributor_init() || !node_registry_init()) {
+        return false;
+    }
+
+    /* Authorization has no mutable initializer.  Its canonical policy must
+     * nevertheless fail closed until later credential adoption. */
+    if (authorization_is_allowed(NULL, CMD_METADATA_WRITE)) {
+        return false;
+    }
+
+    /* The canonical router is linked but has no ingress in G1B. */
+    bool (*volatile router_link)(uint8_t *, uint16_t, delivery_context_t,
+                                 device_command_source_t) =
+        command_router_deliver_from_source;
+    (void)router_link;
+    return true;
+}
 
 static void universal_node_gateway_dispatch_response(
     const universal_node_gateway_rx_event_t *event)
@@ -310,8 +352,19 @@ esp_err_t universal_node_gateway_init(void)
 
     universal_node_gateway_contract_linkage();
     node_identity_init();
-    security_root_init();
+    manufacturing_identity_init();
     if (!provisioning_v2_init()) {
+        s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;
+        return ESP_FAIL;
+    }
+    if (!join_existing_init()) {
+        s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "canonical foundation node=0x%04X manufacturing=%u p2=%u root=%d",
+             node_identity_get(), (unsigned)manufacturing_identity_state(),
+             (unsigned)provisioning_v2_lifecycle(), security_root_has_root());
+    if (!universal_node_gateway_local_platform_init()) {
         s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;
         return ESP_FAIL;
     }
@@ -326,6 +379,29 @@ esp_err_t universal_node_gateway_init(void)
     s_last_submit_result = UNIVERSAL_NODE_GATEWAY_SUBMIT_ADMITTED;
     s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_NONE;
     ESP_LOGI(TAG, "Universal Node gateway boundary initialized");
+    return ESP_OK;
+}
+
+esp_err_t universal_node_gateway_start_provisioning_carrier(void)
+{
+    if (!s_initialized) return ESP_ERR_INVALID_STATE;
+    if (s_provisioning_carrier_started) return ESP_OK;
+
+    /* This is the normal-node BLE stack and ADR-079 carrier; it is not a
+     * Gateway transport and is started before any product ingress. */
+    ble_pairing_policy_init();
+    ble_key_manager_init();
+    ble_bridge_init();
+    const ble_mode_t mode =
+        provisioning_v2_lifecycle() == PROVISIONING_V2_LIFECYCLE_NORMAL
+            ? BLE_MODE_NORMAL
+            : BLE_MODE_PROVISIONING;
+    if (ble_bridge_start(mode) != ESP_OK) {
+        s_last_error = UNIVERSAL_NODE_GATEWAY_STATUS_ERROR_INITIALIZATION_FAILED;
+        return ESP_FAIL;
+    }
+    s_provisioning_carrier_started = true;
+    ESP_LOGI(TAG, "canonical BLE carrier started mode=%u", (unsigned)mode);
     return ESP_OK;
 }
 
