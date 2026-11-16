@@ -1,5 +1,12 @@
 menu "Universal Node Gateway profile"
 
+config UN_MEMBERSHIP_LIFECYCLE_HOST
+    bool "Advertise Membership Lifecycle Host capability"
+    default y
+    help
+        Advertise the existing V2 Membership Lifecycle Host capability.
+        This is a Universal Node capability, not a Gateway-specific role.
+
 config UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
     bool "Enable Gateway/OTBR product traffic"
     default n

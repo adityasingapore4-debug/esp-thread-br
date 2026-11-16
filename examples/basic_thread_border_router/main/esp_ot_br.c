@@ -221,7 +221,12 @@ void app_main(void)
     ESP_ERROR_CHECK(universal_node_gateway_start());
 #else
     ESP_ERROR_CHECK(start_canonical_commissioning_openthread());
+    /* ESP-OTBR owns the only OpenThread instance.  Compose the normal
+     * Universal Node Thread integrations onto it; do not start a second
+     * runtime or enable the Gateway HTTP/LAN product-traffic branch. */
+    ESP_ERROR_CHECK(thread_runtime_attach_existing_instance(
+        esp_openthread_get_instance()) ? ESP_OK : ESP_FAIL);
     ESP_ERROR_CHECK(universal_node_gateway_start_provisioning_carrier());
-    ESP_LOGI(TAG, "G1C/G1D provisioning ready; Gateway HTTP and OTBR traffic disabled");
+    ESP_LOGI(TAG, "G1E provisioning and Registry Sync composition ready; Gateway HTTP/LAN disabled");
 #endif
 }

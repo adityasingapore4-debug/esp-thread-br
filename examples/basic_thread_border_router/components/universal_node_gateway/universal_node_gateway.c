@@ -26,6 +26,9 @@
 #include "device_event_bus.h"
 #include "device_event_distributor.h"
 #include "transport.h"
+#include "transport_backend_selector.h"
+#include "thread_sync_adapter.h"
+#include "thread_device_event_adapter.h"
 #include "address_resolver.h"
 #include "device_metadata.h"
 #include "device_event_delivery.h"
@@ -57,6 +60,16 @@ static void *s_response_consumer_context;
  * transport ingress, start Thread, or start Registry Sync runtime. */
 static bool universal_node_gateway_local_platform_init(void)
 {
+    /* This is the same canonical Thread backend used by normal firmware.
+     * It has no OpenThread lifecycle side effects and is installed before the
+     * externally-owned instance is composed later in ESP-OTBR startup. */
+    address_runtime_resolver_init();
+    transport_backend_init();
+    if (thread_sync_adapter_init() != ESP_OK ||
+        !thread_device_event_adapter_init()) {
+        return false;
+    }
+
     if (!device_event_bus_init() || !rts_init()) {
         return false;
     }
