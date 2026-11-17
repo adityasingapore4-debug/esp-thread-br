@@ -265,6 +265,16 @@ void app_main(void)
         esp_openthread_get_instance()) ? ESP_OK : ESP_FAIL);
     ESP_ERROR_CHECK(universal_node_gateway_start());
 #else
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+    /* FC61 TLS development probe must not enter the canonical uncommissioned
+     * Joiner path when persisted P2 state is incomplete or inconsistent:
+     * that path is allowed to clear orphaned OpenThread Datasets.
+     * Production/normal commissioning behavior remains unchanged. */
+    if (provisioning_v2_lifecycle() != PROVISIONING_V2_LIFECYCLE_NORMAL) {
+        ESP_LOGE(TAG, "DEV TLS probe refuses OpenThread startup: P2 lifecycle is not NORMAL");
+        return;
+    }
+#endif
     ESP_ERROR_CHECK(start_canonical_commissioning_openthread());
     /* ESP-OTBR owns the only OpenThread instance.  Compose the normal
      * Universal Node Thread integrations onto it; do not start a second
