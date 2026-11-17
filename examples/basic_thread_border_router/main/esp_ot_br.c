@@ -24,6 +24,7 @@
 #include "esp_vfs_eventfd.h"
 #include "mdns.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 
@@ -145,6 +146,53 @@ static esp_err_t init_spiffs(void)
 }
 #endif
 
+
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+/* Reuse the existing Gateway Wi-Fi connection implementation, but only with
+ * already-saved configuration. Never fall back to firmware-embedded SSIDs,
+ * SoftAP provisioning, or the legacy product Gateway HTTP/LAN branch. */
+static esp_err_t dev_p4_connect_saved_wifi(void)
+{
+    char ssid[32] = {0};
+    char password[64] = {0};
+    nvs_handle_t settings;
+    esp_err_t result = nvs_open("wifi_config", NVS_READONLY, &settings);
+    if (result != ESP_OK) {
+        goto done;
+    }
+
+    size_t length = sizeof(ssid);
+    result = nvs_get_str(settings, "ssid", ssid, &length);
+    if (result == ESP_OK && ssid[0] != '\0') {
+        length = sizeof(password);
+        result = nvs_get_str(settings, "password", password, &length);
+        if (result == ESP_ERR_NVS_NOT_FOUND) {
+            /* Previously saved open-network settings may omit this key. */
+            password[0] = '\0';
+            result = ESP_OK;
+        }
+    } else if (result == ESP_OK) {
+        result = ESP_ERR_NOT_FOUND;
+    }
+    nvs_close(settings);
+
+    if (result == ESP_OK) {
+        /* The existing helper compares the credentials with wifi_config
+         * before deciding whether to save; these exact values came from the
+         * same namespace, so no credential update should be necessary. */
+        result = esp_ot_wifi_config_init();
+        if (result == ESP_OK) {
+            result = esp_ot_wifi_connect(ssid, password);
+        }
+    }
+done:
+    /* Never log or retain the saved Wi-Fi password in this integration. */
+    volatile char *wipe_password = password;
+    for (size_t i = 0; i < sizeof(password); ++i) wipe_password[i] = 0;
+    return result;
+}
+#endif
+
 void app_main(void)
 {
 #if CONFIG_UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
@@ -236,10 +284,18 @@ void app_main(void)
 #if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
     /* Genuine ESP-IDF TLS handshake only; P4 authentication and product
      * routes remain unregistered until original-header admission is solved. */
-    esp_err_t tls_smoke_result = universal_node_gateway_p4_tls_smoke_start();
-    ESP_LOGI(TAG, "DEV P4 TLS-only listener %s (err=%s)",
-             tls_smoke_result == ESP_OK ? "started" : "unavailable",
-             esp_err_to_name(tls_smoke_result));
+    esp_err_t wifi_result = dev_p4_connect_saved_wifi();
+    if (wifi_result == ESP_OK) {
+        ESP_LOGI(TAG, "DEV P4 LAN connected using saved Wi-Fi configuration");
+        esp_err_t tls_smoke_result = universal_node_gateway_p4_tls_smoke_start();
+        ESP_LOGI(TAG, "DEV P4 TLS-only listener %s (err=%s)",
+                 tls_smoke_result == ESP_OK ? "started" : "unavailable",
+                 esp_err_to_name(tls_smoke_result));
+    } else {
+        /* G1E remains usable for canonical provisioning and Thread work. */
+        ESP_LOGW(TAG, "DEV P4 LAN unavailable (%s); HTTPS listener not started",
+                 esp_err_to_name(wifi_result));
+    }
 #endif
 #endif
 #if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
