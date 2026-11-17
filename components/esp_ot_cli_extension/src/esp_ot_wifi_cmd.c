@@ -190,17 +190,19 @@ static esp_err_t wifi_connect_common(const char *ssid, const char *password,
 {
     if (!s_wifi_initialized) {
         example_wifi_start();
-        /* The DEV probe must not persist Wi-Fi driver config to NVS. */
-        if (!save_to_nvs) {
-            esp_err_t storage_result = esp_wifi_set_storage(WIFI_STORAGE_RAM);
-            if (storage_result != ESP_OK) return storage_result;
-        }
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
         ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
 #endif
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
         handle_wifi_addr_init();
         s_wifi_initialized = true;
+    }
+
+    /* Always select RAM-backed Wi-Fi configuration in the dev-only path,
+     * including when another actor initialized Wi-Fi earlier. */
+    if (!save_to_nvs) {
+        esp_err_t storage_result = esp_wifi_set_storage(WIFI_STORAGE_RAM);
+        if (storage_result != ESP_OK) return storage_result;
     }
 
     if (!s_wifi_handler_registered) {
