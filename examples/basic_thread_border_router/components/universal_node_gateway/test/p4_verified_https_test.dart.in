@@ -1,0 +1,86 @@
+// Synthetic integration only. Production Companion remains read-only.
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:async/async.dart';
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_node_companion/security/p4/p4_server_proof.dart';
+import 'package:universal_node_companion/security/p4/p4_tls_connection.dart';
+import 'package:universal_node_companion/repositories/join_existing_producer_identity.dart';
+import 'package:universal_node_companion/protocol/auth/adr073_auth_codec.dart';
+import 'package:universal_node_companion/protocol/auth/scram_sha256_client.dart';
+import '@@COMPANION_ROOT@@/test/support/join_existing_crypto_fixture.dart';
+import '@@COMPANION_ROOT@@/test/security/p4/fixtures.dart';
+
+class Wire {
+  final SecureSocket socket;
+  late final StreamQueue<List<int>> input = StreamQueue(socket);
+  final List<int> pending = [];
+  Wire(this.socket);
+  Future<({int status, Map<String,String> headers, List<int> body})> post(List<int> body, {String? token}) async {
+    socket.add(ascii.encode('POST /un/p4/auth HTTP/1.1\r\nHost: synthetic\r\nContent-Type: application/octet-stream\r\nContent-Length: ${body.length}\r\n${token == null ? '' : 'Authorization: Bearer $token\r\n'}\r\n'));
+    socket.add(body);await socket.flush();
+    int end = -1;
+    while(end < 0) {
+      pending.addAll(await input.next.timeout(const Duration(seconds: 12)));
+      for(var i=0;i+3<pending.length;i++) {
+        if(pending[i]==13&&pending[i+1]==10&&pending[i+2]==13&&pending[i+3]==10){end=i;break;}
+      }
+    }
+    final lines=ascii.decode(pending.sublist(0,end)).split('\r\n');
+    final status=int.parse(lines.removeAt(0).split(' ')[1]);
+    final headers=<String,String>{};
+    for(final line in lines){final i=line.indexOf(': ');final name=line.substring(0,i).toLowerCase();expect(headers.containsKey(name),isFalse);headers[name]=line.substring(i+2);}
+    final length=int.parse(headers['content-length']!);
+    while(pending.length<end+4+length){pending.addAll(await input.next);}
+    final result=pending.sublist(end+4,end+4+length);pending.removeRange(0,end+4+length);
+    expect(headers['cache-control'],'no-store');
+    return (status:status,headers:headers,body:result);
+  }
+}
+
+void main() {
+ test('manufacturer chain -> actual TLS peer -> canonical Local SCRAM -> token reconnect', () async {
+  final prefix=Platform.environment['P4_TLS_FIXTURE']!;
+  final process=await Process.start('/tmp/gateway-p4-https-fixture',['$prefix.der','$prefix.key']);
+  final output=StreamQueue(process.stdout.transform(utf8.decoder).transform(const LineSplitter()));
+  final errors=process.stderr.drain<void>();final sockets=<SecureSocket>[];
+  addTearDown(() async {for(final s in sockets){s.destroy();}process.kill();await process.exitCode.timeout(const Duration(seconds:15));await output.cancel();await errors;});
+  final context=(await output.next).split(' ');final port=int.parse(context[1]);
+  List<int> hex(String value)=>[for(var i=0;i<value.length;i+=2)int.parse(value.substring(i,i+2),radix:16)];
+  final fixture=await JoinExistingCryptoFixture.create();
+  final signing=await Ed25519().newKeyPair();final principal=hex(context[5]);
+  final device=await fixture.identity(eui64:principal,deviceEdPublic:(await signing.extractPublicKey()).bytes);
+  final proof=Uint8List.fromList([for(var i=0;i<adr086ProofHex.length;i+=2)int.parse(adr086ProofHex.substring(i,i+2),radix:16)]);
+  final node=joinExistingNodeIdFromEui64(principal);expect(node,int.parse(context[7]));
+  proof.setRange(32,48,hex(context[3]));
+  ByteData.sublistView(proof).setUint16(22,node);proof.setRange(24,32,principal);ByteData.sublistView(proof).setUint32(117,1);
+  proof.setRange(121,185,(await Ed25519().sign(proof.sublist(0,121),keyPair:signing)).bytes);
+  final verifier=P4IdentityVerifier(fixture.verifier);
+  final identity=await verifier.verify(attestation:device.rawRecord,proof:proof,expectedNodeId:node,expectedPrincipal:principal,expectedInstallation:proof.sublist(32,48));
+  Future<Wire> connect(VerifiedP4Identity id) async {final socket=await connectP4Tls(host:'127.0.0.1',port:port,identity:id);sockets.add(socket);return Wire(socket);}
+  // A valid signed delegation for a different P4 key cannot authenticate this peer.
+  final wrong=Uint8List.fromList(proof);
+  final otherPoint=Uint8List.fromList([for(var i=0;i<130;i+=2)int.parse('047cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc4766997807775510db8ed040293d9ac69f7430dbba7dade63ce982299e04b79d227873d1'.substring(i,i+2),radix:16)]);
+  wrong.setRange(52,117,otherPoint);wrong.setRange(121,185,(await Ed25519().sign(wrong.sublist(0,121),keyPair:signing)).bytes);
+  final wrongIdentity=await verifier.verify(attestation:device.rawRecord,proof:wrong,expectedNodeId:node,expectedPrincipal:principal,expectedInstallation:proof.sublist(32,48));
+  await expectLater(connect(wrongIdentity),throwsA(anything));
+  final a=await connect(identity);
+  final scram=ScramSha256Client(username:'u',password:'localpassword');
+  final start=Adr073AuthStartRequest(scope:Adr073AuthScope.localSession,clientFirst:scram.start()).encode();
+  final first=await a.post([0x3e,...start]);expect(first.status,200);expect(first.body.first,0x3e);expect(first.headers.containsKey('p4-access-token'),isFalse);
+  final challenge=Adr073AuthStartResponse.decode(first.body.sublist(1));
+  final finalMessage=await scram.clientFinal(challenge.serverFirst);
+  final payload=Adr073AuthProofRequest(transactionId:challenge.transactionId,clientFinal:finalMessage).encode();
+  final second=await a.post([0x3f,...payload]);expect(second.status,200);expect(second.body.first,0x3f);
+  final finished=Adr073AuthProofResponse.decode(second.body.sublist(1));expect(finished.transactionId,challenge.transactionId);await scram.verifyServerFinal(finished.serverFinal);
+  final token=second.headers['p4-access-token']!;expect(token.length,43);expect(base64Url.encode(base64Url.decode('$token=')).replaceAll('=',''),token);
+  a.socket.destroy();
+  final b=await connect(identity);
+  final fresh=ScramSha256Client(username:'u',password:'localpassword');
+  final reconnect=await b.post([0x3e,...Adr073AuthStartRequest(scope:Adr073AuthScope.localSession,clientFirst:fresh.start()).encode()],token:token);
+  expect(reconnect.status,200);expect(await output.next,'BEARER_RESULT 200');fresh.abort();
+ },timeout:const Timeout(Duration(seconds:60)));
+}

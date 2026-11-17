@@ -56,6 +56,8 @@ set(EXTRA_COMPONENT_DIRS
     "${UN_FIRMWARE_ROOT}/components/node_registry"
     "${UN_FIRMWARE_ROOT}/components/notification_fragmentation"
     "${UN_FIRMWARE_ROOT}/components/operation_context"
+    "${UN_FIRMWARE_ROOT}/components/p4_access_session"
+    "${UN_FIRMWARE_ROOT}/components/p4_server_identity"
     "${UN_FIRMWARE_ROOT}/components/physical_presence"
     "${UN_FIRMWARE_ROOT}/components/provisioning_v2"
     "${UN_FIRMWARE_ROOT}/components/registry_revision_security"
