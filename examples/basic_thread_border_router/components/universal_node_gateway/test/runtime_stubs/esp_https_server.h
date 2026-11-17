@@ -32,6 +32,7 @@ typedef struct {
 typedef struct {
  httpd_config_t httpd;
  int transport_mode;
+ uint16_t port_secure;
  uint32_t tls_handshake_timeout_ms;
  const uint8_t *servercert,*prvtkey_pem;
  size_t servercert_len,prvtkey_len;

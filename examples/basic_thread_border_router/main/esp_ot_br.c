@@ -27,6 +27,7 @@
 #include "nvs.h"
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
+#include "dev_heap_diagnostics.h"
 
 #include "border_router_launch.h"
 #include "esp_br_web.h"
@@ -223,7 +224,9 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_vfs_eventfd_register(&eventfd_config));
 #endif
 
+    dev_heap_diagnostics_init();
     ESP_ERROR_CHECK(nvs_flash_init());
+    dev_heap_snapshot("after_nvs_init");
 
     /* ESP-IDF platform entropy is available after platform/NVS startup.
      * Open the canonical Provisioning V2 gate before commissioning starts. */
@@ -233,6 +236,7 @@ void app_main(void)
      * persistent security state.  G1A intentionally stops here unless the
      * later Gateway/OTBR product-traffic profile is selected. */
     ESP_ERROR_CHECK(universal_node_gateway_init());
+    dev_heap_snapshot("after_gateway_init");
 
 #if CONFIG_UN_CLI
     ESP_ERROR_CHECK(universal_node_console_start());
@@ -276,16 +280,20 @@ void app_main(void)
     }
 #endif
     ESP_ERROR_CHECK(start_canonical_commissioning_openthread());
+    dev_heap_snapshot("after_openthread_start");
     /* ESP-OTBR owns the only OpenThread instance.  Compose the normal
      * Universal Node Thread integrations onto it; do not start a second
      * runtime or enable the Gateway HTTP/LAN product-traffic branch. */
     ESP_ERROR_CHECK(thread_runtime_attach_existing_instance(
         esp_openthread_get_instance()) ? ESP_OK : ESP_FAIL);
+    dev_heap_snapshot("after_thread_runtime_attach");
     ESP_ERROR_CHECK(universal_node_gateway_start_provisioning_carrier());
+    dev_heap_snapshot("after_ble_carrier_start");
 #if CONFIG_UN_GATEWAY_DEV_P4_AUTH_PREPARE
     /* Prepare only the canonical Local auth/session owners. Network exposure,
      * P4 key selection and HTTPS admission belong to later DEV milestones. */
     universal_node_gateway_p4_auth_runtime_prepare();
+    dev_heap_snapshot("after_p4_auth_prepare");
     ESP_LOGI(TAG, "DEV P4 Local auth runtime prepared; P4 authentication remains disabled");
 #if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
     /* Genuine ESP-IDF TLS handshake only; P4 authentication and product
@@ -293,7 +301,10 @@ void app_main(void)
     esp_err_t wifi_result = dev_p4_connect_saved_wifi();
     if (wifi_result == ESP_OK) {
         ESP_LOGI(TAG, "DEV P4 LAN connected using saved Wi-Fi configuration");
+        dev_heap_watch_https();
+        dev_heap_snapshot("before_https_listener_start");
         esp_err_t tls_smoke_result = universal_node_gateway_p4_tls_smoke_start();
+        dev_heap_snapshot("after_https_listener_attempt");
         ESP_LOGI(TAG, "DEV P4 TLS-only listener %s (err=%s)",
                  tls_smoke_result == ESP_OK ? "started" : "unavailable",
                  esp_err_to_name(tls_smoke_result));

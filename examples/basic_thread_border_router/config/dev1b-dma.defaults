@@ -1,0 +1,22 @@
+# Second FC61 development candidate. Apply AFTER the preserved PSRAM candidate's
+# resolved sdkconfig. Do not modify config/dev1b-psram.defaults or release defaults.
+
+# Use IDF's supported library BSS/COMMON mappings; no application security tables,
+# OpenThread instance, stacks, DMA buffers or custom linker sections are moved.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+# All nonzero ordinary malloc/calloc/realloc requests prefer PSRAM. Explicit
+# INTERNAL/DMA requests retain their capabilities. Keep the existing 32 KiB
+# internal reserve: increasing it cannot create RAM.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+
+# BSS placement alone does not cover the Wi-Fi + HTTPS internal-stack budget.
+# Use the existing IDF OpenThread platform pool in PSRAM, preserving all 65
+# packet buffers and the single instance/Dataset owner. Keep general OT
+# allocation capabilities unchanged; only its volatile message pool moves.
+CONFIG_OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT=y
+
+# Disable the driver's NVS initialization before RAM storage is selected.
+# Application-owned wifi_config credential reads remain read-only and unchanged.
+# CONFIG_ESP_WIFI_NVS_ENABLED is not set

@@ -1,0 +1,42 @@
+# FC61 ESP32-S3-N8R2: development-only memory qualification profile.
+# Apply after the existing DEV-1B sdkconfig; do not add to production defaults.
+CONFIG_UN_GATEWAY_DEV_P4_AUTH_PREPARE=y
+CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE=y
+CONFIG_UN_GATEWAY_DEV_PSRAM=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_40M=y
+CONFIG_SPIRAM_BOOT_HW_INIT=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_MEMTEST=y
+# CONFIG_SPIRAM_IGNORE_NOTFOUND is not set
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+# Existing Mbed TLS INTERNAL mode bypasses malloc's PSRAM policy. Use the
+# supported default allocator so large TLS buffers follow the same threshold.
+CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC=y
+
+# Keep Wi-Fi's existing buffer model. This preference would force static TX
+# buffers (16 * ~1.6 KiB internal) and changes other networking defaults.
+# Eligible ordinary malloc allocations > 1 KiB already prefer PSRAM above.
+# CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP is not set
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=10
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER=y
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+
+# Keep all default task stacks and static storage internal.
+# CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY is not set
+# CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY is not set
+# CONFIG_SPIRAM_FETCH_INSTRUCTIONS is not set
+# CONFIG_SPIRAM_RODATA is not set
+# CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM is not set
+
+# PSRAM enables these SDK defaults implicitly; keep their prior policies.
+# CONFIG_OPENTHREAD_PLATFORM_MALLOC_CAP_SPIRAM is not set
+# CONFIG_OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT is not set
+# CONFIG_FATFS_ALLOC_PREFER_EXTRAM is not set

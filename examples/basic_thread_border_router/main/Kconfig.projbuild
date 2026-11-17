@@ -44,4 +44,14 @@ config UN_GATEWAY_DEV_P4_TLS_SMOKE
         An independently verified client connection additionally requires
         a trusted manufacturer/installation/P4 proof supplied out of band.
 
+config UN_GATEWAY_DEV_PSRAM
+    bool "FC61 N8R2 PSRAM memory qualification (development only)"
+    depends on UN_GATEWAY_DEV_P4_TLS_SMOKE && SPIRAM
+    default n
+    help
+        Marks the separately selected development PSRAM profile. Require
+        successful 2 MiB PSRAM initialization and heap integration before
+        canonical Gateway services start. Does not initialize hardware twice,
+        change commissioning state or alter the production memory defaults.
+
 endmenu
