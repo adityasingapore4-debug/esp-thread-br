@@ -45,6 +45,12 @@ void esp_ot_wifi_border_router_init_flag_set(bool initialized);
  */
 esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password);
 
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+/* DEV-only Wi-Fi connection: RAM driver storage and no Wi-Fi NVS writes.
+ * Never called by product/CLI paths. Requires credentials read separately. */
+esp_err_t esp_ot_wifi_connect_dev_readonly(const char *ssid, const char *password);
+#endif
+
 /**
  * @brief This function disconnects Wi-Fi.
  *

@@ -183,10 +183,18 @@ void esp_ot_wifi_border_router_init_flag_set(bool initialized)
 }
 #endif
 
-esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
+/* Preserve the existing persisted-credential CLI behavior. The opt-in P4
+ * smoke path shares only Wi-Fi initialization/connection, not NVS mutations. */
+static esp_err_t wifi_connect_common(const char *ssid, const char *password,
+                                    bool save_to_nvs)
 {
     if (!s_wifi_initialized) {
         example_wifi_start();
+        /* The DEV probe must not persist Wi-Fi driver config to NVS. */
+        if (!save_to_nvs) {
+            esp_err_t storage_result = esp_wifi_set_storage(WIFI_STORAGE_RAM);
+            if (storage_result != ESP_OK) return storage_result;
+        }
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
         ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
 #endif
@@ -204,7 +212,7 @@ esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
     }
 
     esp_err_t err = wifi_join(ssid, password);
-    if (err == ESP_OK) {
+    if (err == ESP_OK && save_to_nvs) {
         char old_ssid[SSIDMAXLEN] = "";
         char old_password[PASSWORDMAXLEN] = "";
         esp_ot_wifi_config_get_ssid(old_ssid);
@@ -218,6 +226,18 @@ esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
     }
     return err;
 }
+
+esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
+{
+    return wifi_connect_common(ssid, password, true);
+}
+
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+esp_err_t esp_ot_wifi_connect_dev_readonly(const char *ssid, const char *password)
+{
+    return wifi_connect_common(ssid, password, false);
+}
+#endif
 
 esp_err_t esp_ot_wifi_disconnect(void)
 {

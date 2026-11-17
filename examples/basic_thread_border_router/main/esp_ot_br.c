@@ -177,13 +177,9 @@ static esp_err_t dev_p4_connect_saved_wifi(void)
     nvs_close(settings);
 
     if (result == ESP_OK) {
-        /* The existing helper compares the credentials with wifi_config
-         * before deciding whether to save; these exact values came from the
-         * same namespace, so no credential update should be necessary. */
-        result = esp_ot_wifi_config_init();
-        if (result == ESP_OK) {
-            result = esp_ot_wifi_connect(ssid, password);
-        }
+        /* Explicit no-persist transport: do not open wifi_config RW or use
+         * the normal CLI helper's credential-commit path. */
+        result = esp_ot_wifi_connect_dev_readonly(ssid, password);
     }
 done:
     /* Never log or retain the saved Wi-Fi password in this integration. */
