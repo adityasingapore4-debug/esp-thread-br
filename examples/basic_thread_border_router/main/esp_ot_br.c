@@ -34,6 +34,7 @@
 #include "universal_node_gateway_http_transport.h"
 #include "universal_node_gateway_thread_rx_adapter.h"
 #include "universal_node_gateway_thread_tx_adapter.h"
+#include "universal_node_gateway_p4_runtime.h"
 #include "address_resolver.h"
 #include "provisioning_v2.h"
 #include "thread_runtime.h"
@@ -227,6 +228,12 @@ void app_main(void)
     ESP_ERROR_CHECK(thread_runtime_attach_existing_instance(
         esp_openthread_get_instance()) ? ESP_OK : ESP_FAIL);
     ESP_ERROR_CHECK(universal_node_gateway_start_provisioning_carrier());
+#if CONFIG_UN_GATEWAY_DEV_P4_AUTH_PREPARE
+    /* Prepare only the canonical Local auth/session owners. Network exposure,
+     * P4 key selection and HTTPS admission belong to later DEV milestones. */
+    universal_node_gateway_p4_auth_runtime_prepare();
+    ESP_LOGI(TAG, "DEV P4 Local auth runtime prepared; HTTPS/LAN remain disabled");
+#endif
     ESP_LOGI(TAG, "G1E provisioning and Registry Sync composition ready; Gateway HTTP/LAN disabled");
 #endif
 }

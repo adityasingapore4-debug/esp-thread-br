@@ -5,6 +5,7 @@ get_filename_component(UN_FIRMWARE_ROOT
 idf_component_register(
     SRCS "universal_node_gateway.c"
          "universal_node_gateway_p4_auth.c"
+         "universal_node_gateway_p4_runtime.c"
          "universal_node_gateway_p4_http.c"
          "universal_node_gateway_p4_https.c"
          "universal_node_gateway_diagnostic.c"

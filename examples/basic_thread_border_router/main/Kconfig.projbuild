@@ -15,4 +15,15 @@ config UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
         this starts the existing engineering Gateway HTTP carrier and OTBR
         runtime; that is outside the G1A profile.
 
+config UN_GATEWAY_DEV_P4_AUTH_PREPARE
+    bool "Prepare P4 Local authentication runtime (development only)"
+    depends on !UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
+    default n
+    help
+        Initialize the existing ADR-073 Local authentication transaction table,
+        ADR-074 Local session service and P4 access-token association owner
+        in G1E mode. This opt-in preparation does not start Wi-Fi, a P4 HTTPS
+        listener, Gateway product traffic, or any P4 identity/key provider.
+        It must not be enabled in a release configuration.
+
 endmenu
