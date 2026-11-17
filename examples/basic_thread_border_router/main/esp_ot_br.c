@@ -232,8 +232,20 @@ void app_main(void)
     /* Prepare only the canonical Local auth/session owners. Network exposure,
      * P4 key selection and HTTPS admission belong to later DEV milestones. */
     universal_node_gateway_p4_auth_runtime_prepare();
-    ESP_LOGI(TAG, "DEV P4 Local auth runtime prepared; HTTPS/LAN remain disabled");
+    ESP_LOGI(TAG, "DEV P4 Local auth runtime prepared; P4 authentication remains disabled");
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+    /* Genuine ESP-IDF TLS handshake only; P4 authentication and product
+     * routes remain unregistered until original-header admission is solved. */
+    esp_err_t tls_smoke_result = universal_node_gateway_p4_tls_smoke_start();
+    ESP_LOGI(TAG, "DEV P4 TLS-only listener %s (err=%s)",
+             tls_smoke_result == ESP_OK ? "started" : "unavailable",
+             esp_err_to_name(tls_smoke_result));
 #endif
+#endif
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+    ESP_LOGI(TAG, "G1E ready; product Gateway HTTP/LAN disabled; dev TLS-only probe selected");
+#else
     ESP_LOGI(TAG, "G1E provisioning and Registry Sync composition ready; Gateway HTTP/LAN disabled");
+#endif
 #endif
 }

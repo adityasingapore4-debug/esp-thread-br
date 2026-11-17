@@ -26,4 +26,18 @@ config UN_GATEWAY_DEV_P4_AUTH_PREPARE
         listener, Gateway product traffic, or any P4 identity/key provider.
         It must not be enabled in a release configuration.
 
+config UN_GATEWAY_DEV_P4_TLS_SMOKE
+    bool "TLS-only P4 server smoke test (development only)"
+    depends on UN_GATEWAY_DEV_P4_AUTH_PREPARE
+    depends on !SECURE_BOOT && !SECURE_FLASH_ENC_ENABLED
+    default n
+    help
+        Builds a deliberately ephemeral RAM-only mock P4 storage provider.
+        Starts the existing ESP-IDF HTTPS owner with NO registered HTTP routes;
+        authentication and product ingress remain disabled. No production
+        P4 identity, eFuse, persistent NVS, or Thread Dataset changes.
+        Production Secure Boot / Flash Encryption profiles cannot enable it.
+        An independently verified client connection additionally requires
+        a trusted manufacturer/installation/P4 proof supplied out of band.
+
 endmenu

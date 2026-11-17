@@ -210,14 +210,22 @@ static bool raw_admission_available(void)
 
 esp_err_t gateway_p4_https_start(void)
 {
-    if (!raw_admission_available()) return ESP_ERR_NOT_SUPPORTED;
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+    /* No P4 auth routes or admission authority are reachable in this
+     * isolated development handshake probe. Product mode stays fail-closed. */
+    const bool tls_only = true;
+#else
+    const bool tls_only = false;
+#endif
+    if (!tls_only && !raw_admission_available()) return ESP_ERR_NOT_SUPPORTED;
     if (!owner_lock) owner_lock = xSemaphoreCreateMutexStatic(&owner_lock_storage);
     if (!owner_lock || owner || deadline_timer) return ESP_ERR_INVALID_STATE;
     httpd_ssl_config_t config;
     if (!p4_https_identity_prepare(&config)) return ESP_ERR_INVALID_STATE;
     config.transport_mode = HTTPD_SSL_TRANSPORT_SECURE;
     config.tls_handshake_timeout_ms = 10000;
-    config.httpd.open_fn = opened;
+    config.httpd.open_fn = tls_only ? NULL : opened;
+    if (tls_only) config.port_secure = 8443;
     config.httpd.max_open_sockets = 4;
     config.httpd.max_req_hdr_len = P4_HTTP_HEADER_MAX;
     config.httpd.recv_wait_timeout = 10;
@@ -232,6 +240,11 @@ esp_err_t gateway_p4_https_start(void)
         return result;
     }
     owner = handle;
+    if (tls_only) {
+        /* Only TLS establishment is being qualified. No handlers means no
+         * authentication, token issuance, bearer or product operations. */
+        return ESP_OK;
+    }
     httpd_uri_t route = {.uri = "/un/p4/auth", .method = HTTP_POST, .handler = handler};
     result = httpd_register_uri_handler(handle, &route);
     if (result == ESP_OK) {
