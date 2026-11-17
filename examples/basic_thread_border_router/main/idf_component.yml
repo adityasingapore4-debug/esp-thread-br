@@ -2,7 +2,10 @@
 dependencies:
   espressif/mdns: "^1.0.0"
   espressif/esp_ot_cli_extension:
-    version: "~2.0.0"
+    # Pin the CLI Wi-Fi owner to this repository, not the registry copy in
+    # managed_components. The G2 development Wi-Fi seam lives in this tree.
+    version: "^2.0.0"
+    override_path: ../../../components/esp_ot_cli_extension
   espressif/esp_rcp_update:
     version: "~1.6.0"
   esp_br_http_ota:
