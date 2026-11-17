@@ -1,4 +1,5 @@
 #include "universal_node_gateway_p4_https.h"
+#include "sdkconfig.h"
 #include "universal_node_gateway_p4_http.h"
 #include "p4_https_identity.h"
 #include "esp_timer.h"
