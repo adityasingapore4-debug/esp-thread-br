@@ -1,5 +1,11 @@
 #include "universal_node_gateway_p4_https.h"
 #include "sdkconfig.h"
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+#include "esp_log.h"
+#define DEV_P4_LOG(...) ESP_LOGI("dev_p4", __VA_ARGS__)
+#else
+#define DEV_P4_LOG(...) ((void)0)
+#endif
 #include "universal_node_gateway_p4_http.h"
 #include "p4_https_identity.h"
 #include "esp_timer.h"
@@ -220,9 +226,15 @@ esp_err_t gateway_p4_https_start(void)
 #endif
     if (!tls_only && !raw_admission_available()) return ESP_ERR_NOT_SUPPORTED;
     if (!owner_lock) owner_lock = xSemaphoreCreateMutexStatic(&owner_lock_storage);
+    DEV_P4_LOG("stage=listener_guard lock=%d owner=%d timer=%d",
+               owner_lock != NULL, owner != NULL, deadline_timer != NULL);
     if (!owner_lock || owner || deadline_timer) return ESP_ERR_INVALID_STATE;
     httpd_ssl_config_t config;
-    if (!p4_https_identity_prepare(&config)) return ESP_ERR_INVALID_STATE;
+    if (!p4_https_identity_prepare(&config)) {
+        DEV_P4_LOG("stage=tls_identity_prepare result=failed");
+        return ESP_ERR_INVALID_STATE;
+    }
+    DEV_P4_LOG("stage=tls_identity_prepare result=ok");
     config.transport_mode = HTTPD_SSL_TRANSPORT_SECURE;
     config.tls_handshake_timeout_ms = 10000;
     config.httpd.open_fn = tls_only ? NULL : opened;
@@ -235,6 +247,7 @@ esp_err_t gateway_p4_https_start(void)
     httpd_handle_t handle = NULL;
     accepting = false;
     esp_err_t result = httpd_ssl_start(&handle, &config);
+    DEV_P4_LOG("stage=httpd_ssl_start result=%d", (int)result);
     if (result != ESP_OK) {
         accepting = false;
         p4_https_identity_release();

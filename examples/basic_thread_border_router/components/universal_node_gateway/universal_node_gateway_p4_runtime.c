@@ -10,6 +10,9 @@
 #include "p4_access_session.h"
 
 #include <stdbool.h>
+#if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
+#include "esp_log.h"
+#endif
 
 /* The dedicated P4 adapter owns these RAM-only instances. Neither BLE nor
  * the Gateway's canonical mesh/session services transfer their ownership. */
@@ -36,7 +39,14 @@ void universal_node_gateway_p4_auth_runtime_prepare(void)
 esp_err_t universal_node_gateway_p4_tls_smoke_start(void)
 {
 #if CONFIG_UN_GATEWAY_DEV_P4_TLS_SMOKE
-    if (!s_prepared || !p4_server_identity_init()) {
+    ESP_LOGI("dev_p4", "stage=auth_ready ready=%d", s_prepared);
+    if (!s_prepared) {
+        ESP_LOGE("dev_p4", "stage=auth_not_ready");
+        return ESP_ERR_INVALID_STATE;
+    }
+    const bool identity_ready = p4_server_identity_init();
+    ESP_LOGI("dev_p4", "stage=server_identity_init ready=%d", identity_ready);
+    if (!identity_ready) {
         return ESP_ERR_INVALID_STATE;
     }
     /* This launch is TLS-only. The HTTPS owner registers no URI handlers
