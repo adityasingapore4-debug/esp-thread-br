@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.5)
 # nonzero BOARD_RELAY_COUNT without any Gateway-specific firmware branch.
 add_compile_definitions(BOARD_RELAY_COUNT=0)
 
-set(UN_FIRMWARE_ROOT "/home/aditya/esp/projects/universal-node-thread-fw/firmware")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/universal_node_firmware.cmake")
 
 set(EXTRA_COMPONENT_DIRS
     "${UN_FIRMWARE_ROOT}/components/actuator_driver"
@@ -99,3 +99,12 @@ cmake_policy(SET CMP0079 NEW)
 idf_component_get_property(un_openthread openthread COMPONENT_LIB)
 idf_component_get_property(un_mdns espressif__mdns COMPONENT_LIB)
 target_link_libraries(${un_openthread} PRIVATE ${un_mdns})
+
+# Reject a shadow security owner from a different worktree.
+foreach(un_owner manufacturing_identity p4_server_identity node_identity)
+    idf_component_get_property(un_owner_dir ${un_owner} COMPONENT_DIR)
+    get_filename_component(un_owner_dir "${un_owner_dir}" REALPATH)
+    if(NOT un_owner_dir STREQUAL "${UN_FIRMWARE_ROOT}/components/${un_owner}")
+        message(FATAL_ERROR "Mixed firmware owner ${un_owner}: ${un_owner_dir}")
+    endif()
+endforeach()

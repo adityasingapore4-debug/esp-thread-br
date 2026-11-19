@@ -8,6 +8,7 @@ if [[ "${P4_HTTPS_RUNTIME_MOCK:-0}" == 1 ]]; then
     p4_args=(-DP4_HTTPS_HOST_TEST -Icomponents/universal_node_gateway/test/runtime_stubs "${p4_args[@]}")
     p4_args+=(-I"$p4_fw/components/p4_server_identity/include")
 fi
+p4_args+=(-I"$p4_fw/components/manufacturing_identity/include")
 p4_args+=(-I"$p4_fw/components/p4_access_session/include")
 p4_args+=(-I"$p4_fw/components/p4_access_session/private_include")
 p4_args+=(-I"$p4_fw/tests/support")

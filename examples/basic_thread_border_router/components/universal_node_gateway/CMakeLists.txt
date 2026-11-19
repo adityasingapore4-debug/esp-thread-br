@@ -1,7 +1,3 @@
-get_filename_component(UN_FIRMWARE_ROOT
-    "${CMAKE_CURRENT_LIST_DIR}/../../../../../../universal-node-thread-fw/firmware"
-    ABSOLUTE)
-
 idf_component_register(
     SRCS "universal_node_gateway.c"
          "universal_node_gateway_p4_auth.c"
@@ -26,3 +22,10 @@ target_link_libraries(${COMPONENT_LIB} PRIVATE "-u p4_https_identity_prepare")
 
 # Measure inert carriage as well; no listener startup is installed.
 target_link_libraries(${COMPONENT_LIB} PRIVATE "-u gateway_p4_https_start" "-u gateway_p4_https_stop")
+
+# Inert build qualification only. There is no runtime caller or HTTP registration.
+# Pending architecture approval never enables this option or the listener.
+if(UN_GATEWAY_IDENTITY_EVIDENCE_QUALIFY)
+    target_sources(${COMPONENT_LIB} PRIVATE "universal_node_gateway_p4_identity.c")
+    target_link_libraries(${COMPONENT_LIB} PRIVATE "-u gateway_p4_identity_evidence_build")
+endif()
