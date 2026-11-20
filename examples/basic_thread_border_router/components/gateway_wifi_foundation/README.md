@@ -1,5 +1,13 @@
 # ADR-091 Gateway Wi-Fi foundation
 
+M4W.2B adds an isolated two-slot storage core and an ESP-IDF NVS adapter, with
+production registration absent and NVS writes locked off by default. See
+[STORAGE_REPORT.md](STORAGE_REPORT.md) for the ownership audit, encoding,
+failure matrix, exact validation commands and remaining qualification gates.
+Run `bash components/gateway_wifi_foundation/test/run_storage_tests.sh` from
+the Gateway example; prefix with `SANITIZE=1` for ASan + UBSan. The historical
+M4W.2A description below applies to the codec/transaction foundation.
+
 Host-only development code: no ESP-IDF component registration, command dispatch, Wi-Fi driver, BLE, NVS, Thread, or security authority. It parses business payloads without implementing the Operation Result Envelope. Authorization decisions are supplied by the future owner; BLE connection-generation binding remains an M4W.3 gate. Do not use product credentials.
 
 The asynchronous store is responsible for the durable-promotion linearization point. Before reporting COMMITTED, the state machine reloads the verified authoritative record and checks its generation, SSID, security mode, and credential against the candidate. A failed completion is fenced via cancel_commit before rollback; clear only wipes volatile data. restart must fence outstanding mock operations before reboot recovery and may be invoked with a reset clock. `WIFI_CANCEL_ABORTED` guarantees promotion was fenced; `WIFI_CANCEL_DURABLE` means promotion and readback verification finished; `WIFI_CANCEL_UNKNOWN` means neither outcome is asserted and the state machine remains pending. Completions carry a copied transaction ID, previous generation, and monotonic ticket. The owner serializes callbacks, ensures the state machine outlives them, and drains callbacks before reinitializing it. The store must synchronously copy staged data and never retain the pointer. The mock does not demonstrate real NVS crash consistency or confidentiality.
