@@ -10,7 +10,9 @@ if [[ ${SANITIZE:-0} == 1 ]]; then
     export ASAN_OPTIONS=detect_leaks=0
 fi
 for test_name in test_wifi test_closure test_review test_codec_qualification test_transaction_qualification fuzz_request test_storage test_recovery; do
-    cc "${flags[@]}" "$foundation/wifi_codec.c" "$foundation/wifi_transaction.c" \
+    test_defines=()
+    if [[ $test_name == test_recovery ]]; then test_defines+=(-DWIFI_RECOVERY_HOST_TEST); fi
+    cc "${flags[@]}" "${test_defines[@]}" "$foundation/wifi_codec.c" "$foundation/wifi_transaction.c" \
         "$foundation/wifi_store.c" "$foundation/wifi_recovery.c" \
         "$foundation/test/$test_name.c" -pthread -o "$out_dir/$test_name"
     "$out_dir/$test_name"

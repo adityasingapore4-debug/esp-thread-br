@@ -3,9 +3,23 @@
 #include <string.h>
 
 enum { MAIL_IDLE=0, MAIL_QUEUED=1, MAIL_RUNNING=2, MAIL_DONE=3, MAIL_MASK=3 };
+#define MAIL_REVOKED UINT32_C(0x80000000)
+#define MAIL_STAMP_MAX (MAIL_REVOKED-1u)
+#ifdef WIFI_RECOVERY_HOST_TEST
+/* Test-only barrier after claim, before identity validation. No production hook. */
+void wifi_recovery_test_after_claim(wifi_recovery_t *, const wifi_storage_job_t *);
+#endif
 static uint_fast32_t mail(const wifi_recovery_t *c)
 {
     return atomic_load_explicit(&c->mailbox,memory_order_acquire);
+}
+static void revoke_dispatch(wifi_recovery_t *c)
+{
+    uint_fast32_t value=mail(c);
+    while((value&MAIL_MASK)==MAIL_QUEUED || (value&MAIL_MASK)==MAIL_RUNNING) {
+        if(atomic_compare_exchange_weak_explicit(&c->mailbox,&value,value|MAIL_REVOKED,
+                memory_order_acq_rel,memory_order_acquire)) return;
+    }
 }
 static bool same_job(const wifi_storage_job_t *a, const wifi_storage_job_t *b)
 {
@@ -35,6 +49,7 @@ static void require_restart(wifi_recovery_t *c)
 {
     c->restart_required=true; c->boot_ready=false;
     c->state=WIFI_REC_RESTART_REQUIRED;
+    revoke_dispatch(c);
     /* A running/DONE worker still owns backend memory. Retire only after
      * acquiring its completion or atomically invalidating a queued dispatch. */
     if(fence_queued(c)) {
@@ -44,7 +59,7 @@ static void require_restart(wifi_recovery_t *c)
 }
 static bool queue(wifi_recovery_t *c, wifi_work_kind_t kind)
 {
-    if(mail(c)!=MAIL_IDLE || c->serial==UINT32_MAX/4u) {
+    if(mail(c)!=MAIL_IDLE || c->serial==MAIL_STAMP_MAX/4u) {
         require_restart(c); return false;
     }
     c->work=c->operation;
@@ -71,7 +86,7 @@ static bool stage(void *ctx, const wifi_config_t *candidate, uint32_t generation
        (c->state!=WIFI_REC_IDLE && (!c->delivered ||
        (c->state!=WIFI_REC_DURABLE_VERIFIED && c->state!=WIFI_REC_NOT_PROMOTED_FENCED)))) return false;
     uint64_t now=c->hooks.now_ms(c->hooks.ctx);
-    if(now<c->last_ms || c->serial==UINT32_MAX/4u) { require_restart(c); return false; }
+    if(now<c->last_ms || c->serial==MAIL_STAMP_MAX/4u) { require_restart(c); return false; }
     if(!c->backend.stage(c->backend.ctx,candidate,generation,id,ticket)) return false;
     memset(&c->operation,0,sizeof(c->operation));
     memcpy(c->operation.id,id,16); c->operation.generation=generation;
@@ -150,15 +165,21 @@ bool wifi_recovery_job(const wifi_recovery_t *c, wifi_storage_job_t *job)
 }
 bool wifi_recovery_worker_run(wifi_recovery_t *c, const wifi_storage_job_t *job)
 {
-    if(!c || !job || !c->initialized || !job->stamp || job->stamp>UINT32_MAX ||
+    if(!c || !job || !c->initialized || !job->stamp || job->stamp>MAIL_STAMP_MAX ||
        (job->stamp&MAIL_MASK)) return false;
     uint_fast32_t expected=(uint_fast32_t)job->stamp|MAIL_QUEUED;
     if(!atomic_compare_exchange_strong_explicit(&c->mailbox,&expected,
             (uint_fast32_t)job->stamp|MAIL_RUNNING,memory_order_acq_rel,memory_order_acquire)) return false;
+#ifdef WIFI_RECOVERY_HOST_TEST
+    wifi_recovery_test_after_claim(c,job);
+#endif
     /* Owner cannot alter work/backend while RUNNING. Validate full copied
      * identity after claiming; forged metadata never reaches the backend. */
     if(!same_job(job,&c->work)) {
-        atomic_store_explicit(&c->mailbox,(uint_fast32_t)job->stamp|MAIL_QUEUED,memory_order_release);
+        /* Preserve a concurrent owner's revocation. A stale identity releases
+         * its claim, but must never resurrect an executable queued dispatch.
+         * Only the owner may subsequently acquire/cancel that queued fence. */
+        atomic_fetch_sub_explicit(&c->mailbox,MAIL_RUNNING-MAIL_QUEUED,memory_order_release);
         return false;
     }
     c->worker_boot=false;
@@ -184,6 +205,7 @@ void wifi_recovery_request_restart(wifi_recovery_t *c)
         c->started_ms=c->last_ms=c->hooks.now_ms(c->hooks.ctx); c->attempts=0;
     }
     c->restarting=true; c->boot_ready=false; c->state=WIFI_REC_RECOVERY_REQUIRED;
+    revoke_dispatch(c);
     fence_queued(c); /* RUNNING/DONE is explicitly not a successful fence. */
 }
 void wifi_recovery_poll(wifi_recovery_t *c)
@@ -219,6 +241,10 @@ void wifi_recovery_poll(wifi_recovery_t *c)
     if(!c->restarting && (c->state==WIFI_REC_IDLE || c->state==WIFI_REC_DURABLE_VERIFIED ||
                          c->state==WIFI_REC_NOT_PROMOTED_FENCED)) return;
     if(timed_out(c)) { require_restart(c); return; }
+    /* A rejected claimant may have returned RUNNING to revoked QUEUED after
+     * restart admission. Fence it before scheduling any restart scan. An
+     * unrevoked restart scan already queued by this owner remains executable. */
+    if(c->restarting && (mail(c)&MAIL_REVOKED) && !fence_queued(c)) return;
     if(mail(c)!=MAIL_IDLE) return; /* Cannot interrupt synchronous flash work. */
     if(!c->restarting && c->state!=WIFI_REC_OUTCOME_UNKNOWN &&
        c->state!=WIFI_REC_RECOVERY_REQUIRED) return;

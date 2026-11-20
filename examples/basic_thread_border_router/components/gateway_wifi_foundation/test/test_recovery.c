@@ -12,6 +12,19 @@ typedef struct {
     pthread_cond_t cond;
     bool entered, release;
 } gate_t;
+/* Set before pthread_create and cleared only after join. The hook itself is
+ * compiled into the coordinator only for this host test binary. */
+static gate_t *claim_gate;
+void wifi_recovery_test_after_claim(wifi_recovery_t *c, const wifi_storage_job_t *job)
+{
+    (void)c; (void)job;
+    gate_t *g=claim_gate;
+    if(!g) return;
+    assert(!pthread_mutex_lock(&g->mutex));
+    g->entered=true; assert(!pthread_cond_signal(&g->cond));
+    while(!g->release) assert(!pthread_cond_wait(&g->cond,&g->mutex));
+    assert(!pthread_mutex_unlock(&g->mutex));
+}
 typedef struct {
     uint8_t disk[2][WIFI_STORE_RECORD_MAX];
     size_t len[2];
@@ -254,6 +267,78 @@ static void *thread_run(void *ctx)
 {
     thread_arg_t *arg=ctx; arg->ran=wifi_recovery_worker_run(arg->c,&arg->job); return NULL;
 }
+static void mismatched_restart_fence(void)
+{
+    for(unsigned owner_first=0;owner_first<2;owner_first++) for(unsigned field=0;field<5;field++) {
+        mock_t m={0}; wifi_storage_t s; wifi_recovery_t c={0}; wifi_tx_t tx;
+        seed(&m,0,1,1); setup(&m,&s,&c);
+        wifi_storage_job_t valid=begin_tx(&m,&c,&tx), wrong=valid;
+        switch(field) {
+        case 0: wrong.epoch++; break;
+        case 1: wrong.id[0]^=1; break;
+        case 2: wrong.generation++; break;
+        case 3: wrong.ticket++; break;
+        default: wrong.kind=WIFI_WORK_RECOVER; break;
+        }
+        gate_t gate={PTHREAD_MUTEX_INITIALIZER,PTHREAD_COND_INITIALIZER,false,false};
+        claim_gate=&gate;
+        thread_arg_t arg={&c,wrong,false}; pthread_t thread;
+        unsigned reads=m.reads, reopens=m.reopens;
+        if(owner_first) wifi_recovery_request_restart(&c);
+        CHECK(!pthread_create(&thread,NULL,thread_run,&arg));
+        if(!owner_first) {
+            CHECK(!pthread_mutex_lock(&gate.mutex));
+            while(!gate.entered) CHECK(!pthread_cond_wait(&gate.cond,&gate.mutex));
+            CHECK(!pthread_mutex_unlock(&gate.mutex));
+            CHECK(wifi_recovery_status(&c).state==WIFI_REC_EXECUTING);
+            wifi_recovery_request_restart(&c);
+            /* Poll during the rejected claimant's RUNNING interval cannot
+             * cancel its backend, wipe its candidate or schedule a scan. */
+            wifi_recovery_poll(&c);
+            CHECK(!wifi_recovery_status(&c).quiescent);
+            CHECK(!zero(&s.candidate,sizeof(s.candidate)));
+            CHECK(c.attempts==0 && !wifi_recovery_status(&c).boot_ready);
+            CHECK(!pthread_mutex_lock(&gate.mutex)); gate.release=true;
+            CHECK(!pthread_cond_signal(&gate.cond)); CHECK(!pthread_mutex_unlock(&gate.mutex));
+        }
+        CHECK(!pthread_join(thread,NULL)); claim_gate=NULL;
+        CHECK(!arg.ran); CHECK(gate.entered==!owner_first);
+        CHECK(m.reads==reads && m.reopens==reopens && !m.writes && !m.commits);
+        /* Rejected metadata must not publish either a real or forged outcome.
+         * Even BEFORE the owner's next poll, the delayed correct dispatch is
+         * nonexecutable: revocation survives the worker's return to QUEUED. */
+        CHECK(!wifi_recovery_worker_run(&c,&valid));
+        CHECK(!wifi_recovery_worker_run(&c,&wrong));
+        wifi_storage_completion_t completion, forged={valid,WIFI_CANCEL_DURABLE};
+        CHECK(!wifi_recovery_completion(&c,&completion));
+        CHECK(!wifi_recovery_deliver(&c,&tx,&forged));
+        forged.outcome=WIFI_CANCEL_ABORTED;
+        CHECK(!wifi_recovery_deliver(&c,&tx,&forged));
+        CHECK(rejects_new(&c)); CHECK(tx.ticket==valid.ticket && tx.generation==1);
+        wifi_recovery_poll(&c);
+        CHECK(zero(&s.candidate,sizeof(s.candidate))); /* Owner acquired queued fence. */
+        CHECK(!m.writes && !m.commits && c.attempts==1);
+        wifi_storage_job_t scan; CHECK(wifi_recovery_job(&c,&scan));
+        CHECK(scan.kind==WIFI_WORK_RESTART_SCAN && scan.stamp!=valid.stamp);
+        /* Repeated poll must preserve the owner's unrevoked restart scan. */
+        wifi_recovery_poll(&c);
+        CHECK(c.attempts==1 && !wifi_recovery_worker_run(&c,&valid));
+        CHECK(wifi_recovery_worker_run(&c,&scan)); wifi_recovery_poll(&c);
+        CHECK(wifi_recovery_status(&c).boot_ready && wifi_recovery_status(&c).quiescent);
+        CHECK(c.epoch==valid.epoch+1 && !wifi_recovery_completion(&c,&completion));
+        CHECK(rejects_new(&c));
+        CHECK(wifi_tx_event(&tx,WIFI_EVENT_REBOOT,0));
+        CHECK(tx.state==WIFI_TX_IDLE && tx.generation==1);
+        CHECK(zero(&tx.candidate,sizeof(tx.candidate)) && !tx.recent_count && zero(tx.id,16));
+        wifi_storage_job_t fresh=begin_existing_tx(&m,&c,&tx);
+        CHECK(fresh.ticket==valid.ticket+1 && fresh.epoch==valid.epoch+1);
+        CHECK(!wifi_recovery_worker_run(&c,&valid) && !wifi_recovery_worker_run(&c,&wrong));
+        CHECK(!wifi_recovery_deliver(&c,&tx,&forged));
+        CHECK(!m.writes);
+        CHECK(!pthread_mutex_destroy(&gate.mutex)); CHECK(!pthread_cond_destroy(&gate.cond));
+    }
+    puts("10 deterministic mismatch/restart interleavings: revoked queue, opposite fence, no forged outcome: PASS");
+}
 static void running_restart(void)
 {
     for(unsigned outcome=0;outcome<3;outcome++) for(unsigned deadline=0;deadline<2;deadline++) {
@@ -432,6 +517,7 @@ int main(void)
     boot_selection_and_failures(); normal_completion(); ownership_and_pre_gate();
     unknown_transaction_and_mismatch();
     idle_restart_admission();
+    mismatched_restart_fence();
     printf("HOST_RECOVERY_SIMULATION: %u checks passed\n",checks);
     return 0;
 }
