@@ -30,3 +30,24 @@ The sole transaction owner must serialize event admission in order. Stability co
 The gate is not durability proof. A successful callback or a DURABLE indication still requires the existing verified committed-record reload and byte comparison. A failed callback triggers an explicit backend fence: ABORTED means all late writes are fenced; DURABLE requires verified readback; UNKNOWN leaves the transaction single-writer blocked until a later definitive outcome or successful restart fence. A disconnected connection cannot project transaction status. This is host-only contract evidence, not real NVS crash-consistency evidence.
 
 Candidate credentials remain in memory while an admitted storage operation is unresolved because verification may still require them; terminal outcomes and successful restart clear them. Such unresolved retention is not acceptable as an unbounded production lifecycle: bounded backend completion and recovery are M4W.2B gates. M4W.3 must prove event queue order, BLE lifetime and one-use Admin admission.
+
+## Host qualification tests
+
+From the Gateway example directory, run the six focused programs and the two
+published hash-vector checks:
+
+```sh
+for test_name in test_wifi test_closure test_review test_codec_qualification test_transaction_qualification fuzz_request; do
+  cc -std=c11 -Wall -Wextra -Werror -pedantic -Icomponents/gateway_wifi_foundation \
+    components/gateway_wifi_foundation/wifi_codec.c \
+    components/gateway_wifi_foundation/wifi_transaction.c \
+    "components/gateway_wifi_foundation/test/$test_name.c" -o "/tmp/m4w_$test_name" && "/tmp/m4w_$test_name" || exit
+done
+python3 components/gateway_wifi_foundation/test/test_vectors.py
+```
+
+For ASan and UBSan, add `-fsanitize=address,undefined -fno-omit-frame-pointer`
+and run the binaries with `ASAN_OPTIONS=detect_leaks=0` when LeakSanitizer is
+unavailable. The mutation test uses seed `0x09102a01` and 100,000 iterations;
+it is deterministic mutation testing, not coverage-guided fuzzing. The tests
+exercise a host mock, not actual NVS, BLE, Wi-Fi, or power-loss behavior.
