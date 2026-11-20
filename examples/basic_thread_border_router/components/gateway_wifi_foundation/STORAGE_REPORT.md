@@ -1,5 +1,10 @@
 # M4W.2B storage foundation implementation report
 
+M1/M2 historical report. The later [M3 recovery report](STORAGE_RECOVERY_REPORT.md)
+documents the coordinator, runtime fencing seam and stronger process-lifetime
+NVS uncertainty latch. M3 leaves the encoding below unchanged. Fresh adapter
+construction cannot clear NVS uncertainty in the same process.
+
 Date: 2026-11-20. Submitted for independent review; this is not M4W.2B acceptance.
 
 ```text

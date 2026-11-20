@@ -211,3 +211,9 @@ wifi_cancel_result_t wifi_storage_recover(wifi_storage_t *s)
     }
     return result;
 }
+void wifi_storage_retire_for_restart(wifi_storage_t *s)
+{
+    s->ready=false;
+    s->state=WIFI_STORAGE_UNKNOWN;
+    wipe_operation(s);
+}

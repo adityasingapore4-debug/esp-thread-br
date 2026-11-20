@@ -9,6 +9,7 @@ typedef struct { size_t available_entries; } nvs_stats_t;
 #define ESP_OK 0
 #define ESP_ERR_NVS_NOT_FOUND 1
 #define ESP_ERR_NVS_TYPE_MISMATCH 2
+#define ESP_ERR_NVS_REMOVE_FAILED 3
 esp_err_t nvs_open_from_partition(const char *, const char *, nvs_open_mode_t, nvs_handle_t *);
 void nvs_close(nvs_handle_t);
 esp_err_t nvs_get_blob(nvs_handle_t, const char *, void *, size_t *);

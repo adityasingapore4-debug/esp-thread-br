@@ -2,6 +2,9 @@
 #include <string.h>
 
 static const char *const keys[2]={"slot_a","slot_b"};
+/* One serialized storage worker. This latch belongs to the NVS lifetime, not
+ * an adapter object. Do not clear it on handle close or adapter replacement. */
+static bool subsystem_uncertain;
 #ifdef WIFI_NVS_ISOLATED_SYNTHETIC_TEST
 static const bool synthetic_writes=true;
 #else
@@ -20,7 +23,7 @@ static bool reopen(void *ctx)
     /* REMOVE_FAILED can require NVS reinitialization, not just handle reopen.
      * This component cannot deinitialize shared NVS safely. Keep UNKNOWN until
      * an external controlled real restart reinitializes the partition. */
-    if(a->uncertain) return false;
+    if(wifi_nvs_restart_required(a)) return false;
     esp_err_t err=nvs_open_from_partition(WIFI_STORE_PARTITION,WIFI_STORE_NAMESPACE,
                                         NVS_READONLY,&a->handle);
     if(err==ESP_ERR_NVS_NOT_FOUND) return true;
@@ -31,6 +34,7 @@ static wifi_io_result_t read_slot(void *ctx, unsigned slot, uint8_t *p, size_t c
 {
     wifi_nvs_adapter_t *a=ctx;
     *n=0;
+    if(wifi_nvs_restart_required(a)) return WIFI_IO_ERROR;
     if(slot>1 || cap>WIFI_STORE_RECORD_MAX) return WIFI_IO_ERROR;
     if(!a->opened) return WIFI_IO_MISSING;
     size_t size=0;
@@ -46,7 +50,7 @@ static wifi_io_result_t read_slot(void *ctx, unsigned slot, uint8_t *p, size_t c
 static bool write_slot(void *ctx, unsigned slot, const uint8_t *p, size_t n)
 {
     wifi_nvs_adapter_t *a=ctx;
-    if(!synthetic_writes || a->uncertain || slot>1 || n<16 || n>WIFI_STORE_RECORD_MAX) return false;
+    if(!synthetic_writes || wifi_nvs_restart_required(a) || slot>1 || n<16 || n>WIFI_STORE_RECORD_MAX) return false;
     /* Best-effort capacity guard; shared users may allocate after this check.
      * nvs_set_blob errors remain UNKNOWN, including REMOVE_FAILED. */
     nvs_stats_t stats={0};
@@ -59,20 +63,26 @@ static bool write_slot(void *ctx, unsigned slot, const uint8_t *p, size_t n)
         a->opened=true; a->writable=true;
     }
     bool ok=nvs_set_blob(a->handle,keys[slot],p,n)==ESP_OK;
-    if(!ok) a->uncertain=true;
+    if(!ok) a->uncertain=subsystem_uncertain=true;
     return ok;
 }
 static bool commit(void *ctx)
 {
     wifi_nvs_adapter_t *a=ctx;
-    if(!synthetic_writes || a->uncertain || !a->opened || !a->writable) return false;
+    if(!synthetic_writes || wifi_nvs_restart_required(a) || !a->opened || !a->writable) return false;
     bool ok=nvs_commit(a->handle)==ESP_OK;
-    if(!ok) a->uncertain=true;
+    if(!ok) a->uncertain=subsystem_uncertain=true;
     return ok;
 }
 wifi_store_io_t wifi_nvs_boundary(wifi_nvs_adapter_t *a)
 {
     /* Fresh adapter only. No NVS API is called until the owner initializes. */
     memset(a,0,sizeof(*a));
+    a->uncertain=subsystem_uncertain;
     wifi_store_io_t io={a,read_slot,write_slot,commit,reopen}; return io;
+}
+bool wifi_nvs_restart_required(void *ctx)
+{
+    const wifi_nvs_adapter_t *a=ctx;
+    return subsystem_uncertain || a->uncertain;
 }

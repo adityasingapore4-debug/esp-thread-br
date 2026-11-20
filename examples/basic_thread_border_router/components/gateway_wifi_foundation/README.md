@@ -4,6 +4,9 @@ M4W.2B adds an isolated two-slot storage core and an ESP-IDF NVS adapter, with
 production registration absent and NVS writes locked off by default. See
 [STORAGE_REPORT.md](STORAGE_REPORT.md) for the ownership audit, encoding,
 failure matrix, exact validation commands and remaining qualification gates.
+M3 adds an unregistered recovery coordinator and worker fencing seam; see
+[STORAGE_RECOVERY_REPORT.md](STORAGE_RECOVERY_REPORT.md) for its lifecycle,
+caller-supplied policy, scheduler contract and controlled restart requirements.
 Run `bash components/gateway_wifi_foundation/test/run_storage_tests.sh` from
 the Gateway example; prefix with `SANITIZE=1` for ASan + UBSan. The historical
 M4W.2A description below applies to the codec/transaction foundation.

@@ -30,7 +30,7 @@ typedef struct {
     uint64_t ticket, last_ticket;
     int slot, target_slot;
     wifi_storage_state_t state;
-    bool ready;
+    bool ready, coordinator_attached;
 } wifi_storage_t;
 
 bool wifi_record_encode(const wifi_config_t *, uint32_t, uint8_t *, size_t, size_t *);
@@ -43,4 +43,8 @@ wifi_cancel_result_t wifi_storage_execute(wifi_storage_t *, const uint8_t[16], u
 /* One reopen and one two-slot scan, no retry loop. A boundary that cannot reopen
  * leaves UNKNOWN and excludes new work. Vendor wall-clock bound is unqualified. */
 wifi_cancel_result_t wifi_storage_recover(wifi_storage_t *);
+/* Coordinator-only lifetime boundary. Requires queued work invalidated and all
+ * running calls returned/completions drained. Retires RAM, never proves abort,
+ * never clears an adapter latch and cannot permit another write. */
+void wifi_storage_retire_for_restart(wifi_storage_t *);
 #endif

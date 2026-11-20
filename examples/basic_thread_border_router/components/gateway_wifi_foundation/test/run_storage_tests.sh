@@ -9,9 +9,10 @@ if [[ ${SANITIZE:-0} == 1 ]]; then
     flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -no-pie)
     export ASAN_OPTIONS=detect_leaks=0
 fi
-for test_name in test_wifi test_closure test_review test_codec_qualification test_transaction_qualification fuzz_request test_storage; do
+for test_name in test_wifi test_closure test_review test_codec_qualification test_transaction_qualification fuzz_request test_storage test_recovery; do
     cc "${flags[@]}" "$foundation/wifi_codec.c" "$foundation/wifi_transaction.c" \
-        "$foundation/wifi_store.c" "$foundation/test/$test_name.c" -o "$out_dir/$test_name"
+        "$foundation/wifi_store.c" "$foundation/wifi_recovery.c" \
+        "$foundation/test/$test_name.c" -pthread -o "$out_dir/$test_name"
     "$out_dir/$test_name"
 done
 for variant in locked synthetic; do
@@ -21,5 +22,6 @@ for variant in locked synthetic; do
         "$foundation/wifi_store_nvs.c" "$foundation/test/test_nvs_adapter.c" \
         -o "$out_dir/nvs_$variant"
     "$out_dir/nvs_$variant"
+    if [[ $variant == synthetic ]]; then "$out_dir/nvs_$variant" commit; fi
 done
 python3 "$foundation/test/test_vectors.py"
