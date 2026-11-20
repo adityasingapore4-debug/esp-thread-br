@@ -6,11 +6,12 @@
 #include <stdint.h>
 typedef struct { wifi_config_t committed, staged; uint32_t generation, staged_generation; bool fail_stage, fail_restore, pending, cancel_unknown; } mock_t;
 static bool load(void *p,wifi_config_t *c,uint32_t *g) { mock_t *m=p; *c=m->committed; *g=m->generation; return true; }
-static bool stage(void *p,const wifi_config_t *c,uint32_t g) { mock_t *m=p; if(m->fail_stage) return false; m->staged=*c; m->staged_generation=g; m->pending=true; return true; }
+static bool stage(void *p,const wifi_config_t *c,uint32_t g) { mock_t *m=p; if(m->fail_stage) { m->pending=true; return false; } m->staged=*c; m->staged_generation=g; m->pending=true; return true; }
 static wifi_cancel_result_t cancel(void *p) { mock_t *m=p; if(m->cancel_unknown) return WIFI_CANCEL_UNKNOWN; if(!m->pending) return WIFI_CANCEL_DURABLE; m->pending=false; return WIFI_CANCEL_ABORTED; }
 static bool restore(void *p,const wifi_config_t *c,uint32_t g) { mock_t *m=p; (void)c; (void)g; return !m->fail_restore; }
 static void clear(void *p) { mock_t *m=p; wifi_zero(&m->staged,sizeof(m->staged)); m->pending=false; }
-static wifi_store_t store(mock_t *m) { wifi_store_t s={m,load,stage,cancel,restore,clear}; return s; }
+static bool restart(void *p) { mock_t *m=p; m->pending=false; return true; }
+static wifi_store_t store(mock_t *m) { wifi_store_t s={m,load,stage,cancel,restore,clear,restart}; return s; }
 static void promote(mock_t *m) { assert(m->pending); m->committed=m->staged; m->generation=m->staged_generation; m->pending=false; }
 int main(void) {
  uint8_t v[]={1,3,0,0,0,0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff,1,4,8,0,'T','E','S','T','p','a','s','s','w','o','r','d'};
