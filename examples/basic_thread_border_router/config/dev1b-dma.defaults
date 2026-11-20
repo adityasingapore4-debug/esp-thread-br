@@ -20,3 +20,6 @@ CONFIG_OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT=y
 # Disable the driver's NVS initialization before RAM storage is selected.
 # Application-owned wifi_config credential reads remain read-only and unchanged.
 # CONFIG_ESP_WIFI_NVS_ENABLED is not set
+
+# FC61 TLS-smoke stack size validated during G2 DEV-1B HIL.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

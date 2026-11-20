@@ -1,5 +1,30 @@
 # DEV-1B second Wi-Fi failure: internal DMA-memory correction
 
+## Later DEV-1B closure evidence (2026-11-18)
+
+The user reports FC61 hardware validation of binary SHA-256
+`e718f74c057504a3df90544a78a94ea512d9272642fb58c916149848a890a82e`
+(1,693,728 bytes), with an 8192-byte main stack. PSRAM, Wi-Fi, BLE,
+OpenThread attachment, P4 identity preparation and the TLS-only listener
+passed; five sequential TLS 1.2 handshakes and memory recovery passed.
+After the fifth disconnect: internal free 18,567; DMA free 10,607;
+DMA largest 7,936; PSRAM free 2,018,872 bytes; 19 tasks. This evidence
+is user-supplied, not a new hardware run in this review.
+
+DEVELOPMENT_TLS_SMOKE: VALIDATED for that exact binary and sequential test.
+PRODUCTION_GATEWAY_HTTPS: NOT_YET_VALIDATED. The self-signed certificate
+does not establish production trust. Concurrency, indefinite stability and
+Registry Sync convergence were not validated by this evidence.
+
+Merge readiness remains blocked: the P4 principal binding accepts both native
+EUI-64 and expanded EUI-48 derivations for an ambiguous FF:FE principal without
+an authenticated platform discriminator. ADR-084 and ADR-086 require the
+canonical principal/Node-ID binding; its resolution needs security/architecture
+review, not a silent change to identity ownership. The development overlay now
+records the 8192-byte stack, but the build's base resolved sdkconfig is an
+ignored build artifact and must be made reproducible from reviewed tracked inputs.
+The historical investigation below describes earlier candidates and results.
+
 **Verdict: PARTIAL.** The second allocation failure is confirmed by the supplied
 FC61 hardware evidence. A separately built, minimally scoped development memory
 candidate passes software checks. No hardware operation was performed here.
