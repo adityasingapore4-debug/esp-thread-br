@@ -1,5 +1,23 @@
 # M4W.2B M4.2B.3A offline worker review candidate
 
+## Concurrency correction
+
+The serialized owner requests coordinator restart before stopping submitted
+work. That coordinator request owns revocation and fencing; scheduler shutdown
+does not establish cancellation, durability, or coordinator retirement. Under
+the scheduler mutex, stop prevents a pending copy from being dispatched; an
+already dispatched call drains before join. The coordinator and backend must
+outlive the join. A test-only condition-variable gate holds the copied job before
+dispatch so restart-first and stop-pending cases are deterministic; a mock I/O
+barrier holds a claimed worker for the claim-first and stop-running cases.
+
+Correction validation: strict C11 worker integration **236 checks**, including
+combined ASan/UBSan; recovery **2,067 checks**; storage **4,431 checks**;
+fixture guard **1,680 checks**; occupancy **12 tests**; qualification isolation
+and `git diff --check` passed. Only host files changed, so the prior v5.5.2
+inert build remains applicable and was not rerun for this correction. The
+v5.5.4 compilation limitation documented below remains unresolved.
+
 Status: **PARTIAL**, submitted for independent source review, not acceptance.
 The host scheduler copies jobs and runs the accepted recovery worker against the
 existing in-memory `wifi_store_io_t` mock. It does not link the real NVS adapter.

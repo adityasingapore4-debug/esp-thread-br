@@ -7,7 +7,13 @@ static void *worker_main(void *arg)
     pthread_mutex_lock(&w->mutex);
     for(;;) {
         while(!w->pending && !w->stopping) pthread_cond_wait(&w->cond,&w->mutex);
-        if(w->stopping && !w->pending) break;
+        if(w->stopping) break;
+        while(w->paused && !w->stopping) {
+            w->parked=true; pthread_cond_broadcast(&w->cond);
+            pthread_cond_wait(&w->cond,&w->mutex);
+        }
+        w->parked=false;
+        if(w->stopping) break;
         wifi_storage_job_t job=w->job;
         w->pending=false; w->active=true;
         pthread_mutex_unlock(&w->mutex);
@@ -43,15 +49,37 @@ bool qual_worker_wait(qual_worker_t *w, bool *accepted)
     if(!w || !w->started || !accepted) return false;
     pthread_mutex_lock(&w->mutex);
     if(!w->pending && !w->active && !w->completed) { pthread_mutex_unlock(&w->mutex); return false; }
-    while(!w->completed) pthread_cond_wait(&w->cond,&w->mutex);
+    while(!w->completed && !(w->stopping && !w->active)) pthread_cond_wait(&w->cond,&w->mutex);
+    if(!w->completed) { pthread_mutex_unlock(&w->mutex); return false; }
     *accepted=w->accepted; w->completed=false; memset(&w->job,0,sizeof(w->job));
+    pthread_mutex_unlock(&w->mutex); return true;
+}
+bool qual_worker_pause(qual_worker_t *w, bool pause)
+{
+    if(!w || !w->started) return false;
+    pthread_mutex_lock(&w->mutex);
+    bool ok=!w->stopping && (!pause || (!w->pending && !w->active && !w->completed));
+    if(ok) { w->paused=pause; pthread_cond_broadcast(&w->cond); }
+    pthread_mutex_unlock(&w->mutex); return ok;
+}
+bool qual_worker_wait_parked(qual_worker_t *w)
+{
+    if(!w || !w->started) return false;
+    pthread_mutex_lock(&w->mutex);
+    if(!w->paused || !w->pending || w->stopping) { pthread_mutex_unlock(&w->mutex); return false; }
+    while(!w->parked && !w->stopping) pthread_cond_wait(&w->cond,&w->mutex);
+    bool ok=w->parked && !w->stopping;
+    pthread_mutex_unlock(&w->mutex); return ok;
+}
+bool qual_worker_request_stop(qual_worker_t *w)
+{
+    if(!w || !w->started) return false;
+    pthread_mutex_lock(&w->mutex); w->stopping=true; pthread_cond_broadcast(&w->cond);
     pthread_mutex_unlock(&w->mutex); return true;
 }
 bool qual_worker_stop(qual_worker_t *w)
 {
-    if(!w || !w->started) return false;
-    pthread_mutex_lock(&w->mutex); w->stopping=true; pthread_cond_signal(&w->cond);
-    pthread_mutex_unlock(&w->mutex);
+    if(!qual_worker_request_stop(w)) return false;
     if(pthread_join(w->thread,NULL)) return false;
     pthread_cond_destroy(&w->cond); pthread_mutex_destroy(&w->mutex);
     memset(w,0,sizeof(*w)); return true;
