@@ -133,7 +133,7 @@ git diff --check
 git status --short
 ```
 
-Ten offline test methods pass, covering all twelve profiles under both versions,
+Twelve offline test methods pass, covering all twelve profiles under both versions,
 deterministic output, arithmetic, capacity boundaries, source-backed lengths,
 complete arrays, journal inclusion, supported/unsupported NimBLE features,
 missing/tampered evidence, schema version, duplicate keys, type/size rejection,

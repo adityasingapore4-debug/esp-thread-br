@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='adr091-552-abi-',dir='/tmp') as tmp:
    if key.endswith('_offset'): found[key]-=1
   results.update(found)
  wifi=original.GATEWAY/'components/gateway_wifi_foundation/wifi_store.c'
- assert call(['git','-C',str(original.GATEWAY),'rev-parse','HEAD'])=='ecc083dfa7a01590ba2d2190b7bf5369d0022a04'
+ original.verify_gateway_source()
  assert not call(['git','-C',str(original.GATEWAY),'status','--porcelain','--',str(wifi),str(wifi.with_suffix('.h'))])
  assert 'size_t len=16u+c->ssid_len+c->secret_len' in wifi.read_text()
  probe=Path(tmp)/'wifi.c'; obj=Path(tmp)/'wifi.o'

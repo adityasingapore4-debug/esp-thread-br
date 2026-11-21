@@ -24,6 +24,12 @@ assert (project / "partitions.qual.csv").read_text().count("nvs, data, nvs, 0x90
 
 repo = Path(subprocess.check_output(["git", "-C", str(project), "rev-parse", "--show-toplevel"], text=True).strip())
 allowed = project.relative_to(repo).as_posix() + "/"
+baseline = "ecc083dfa7a01590ba2d2190b7bf5369d0022a04"
+review = "10367ab83b46ab98150252453f06fdc9b6f1da61"
+subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", baseline, review], check=True)
+subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", review, "HEAD"], check=True)
+committed = subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", baseline, "HEAD"], text=True).splitlines()
+assert committed and all(path.startswith(allowed) for path in committed), committed
 changed = subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", "HEAD"], text=True).splitlines()
 new = subprocess.check_output(["git", "-C", str(repo), "ls-files", "--others", "--exclude-standard"], text=True).splitlines()
 assert all(path.startswith(allowed) for path in changed + new), (changed, new)
@@ -53,4 +59,4 @@ if len(sys.argv) == 2:
     assert not sdk.get("NVS_ENCRYPTION", False) and not sdk.get("SECURE_FLASH_ENC_ENABLED", False)
     print("ESP_IDF_BUILD_ISOLATION: PASS; no NVS, radio or production component selected")
     print("GENERATED_TEST_PARTITION_GEOMETRY: PASS; nvs 0x9000/0x6000, qual_app 0x10000/0x100000")
-print(f"SOURCE_AND_SCOPE_ISOLATION: PASS; {len(new)} new files inside qualification project")
+print(f"SOURCE_AND_SCOPE_ISOLATION: PASS; {len(committed)} committed / {len(changed)} modified / {len(new)} new files inside qualification project")

@@ -14,6 +14,16 @@ SRC = Path('/home/aditya/esp/projects/un-fw-adr090/firmware')
 GATEWAY = Path(__file__).resolve().parents[5]
 BUILD = GATEWAY / 'build/dev1b-dma'
 ORIGINAL = '/home/aditya/esp/projects/universal-node-thread-fw/firmware'
+GATEWAY_BASE = 'ecc083dfa7a01590ba2d2190b7bf5369d0022a04'
+GATEWAY_REVIEW = '10367ab83b46ab98150252453f06fdc9b6f1da61'
+def verify_gateway_source():
+ root=GATEWAY/'components/gateway_wifi_foundation'
+ protected=[str(root/name) for name in ('wifi_store.c','wifi_store.h','wifi_store_nvs.c','wifi_store_nvs.h','wifi_codec.c','wifi_codec.h','wifi_transaction.c','wifi_transaction.h','wifi_recovery.c','wifi_recovery.h')]
+ assert run(['git','-C',str(GATEWAY),'rev-parse',GATEWAY_BASE])==GATEWAY_BASE
+ subprocess.run(['git','-C',str(GATEWAY),'merge-base','--is-ancestor',GATEWAY_BASE,GATEWAY_REVIEW],check=True)
+ subprocess.run(['git','-C',str(GATEWAY),'merge-base','--is-ancestor',GATEWAY_REVIEW,'HEAD'],check=True)
+ assert not run(['git','-C',str(GATEWAY),'diff','--name-only',GATEWAY_BASE,'HEAD','--',*protected]), 'committed production source differs'
+ assert not run(['git','-C',str(GATEWAY),'status','--porcelain','--',*protected]), 'working production source differs'
 TYPES = {
  'provisioning_v2.c': {'provisioning_state':'sizeof(provisioning_v2_state_record_t)', 'provisioning_state_align':'_Alignof(provisioning_v2_state_record_t)', 'provisioning_journal':'sizeof(provisioning_v2_journal_t)', 'provisioning_journal_align':'_Alignof(provisioning_v2_journal_t)', 'provisioning_credential':'sizeof(provisioning_v2_credential_record_t)', 'provisioning_credential_align':'_Alignof(provisioning_v2_credential_record_t)', 'state_credentials_offset':'offsetof(provisioning_v2_state_record_t,credentials)+1'},
  'node_registry.c': {'registry_entry':'sizeof(node_registry_persistent_state_t)', 'registry_entry_align':'_Alignof(node_registry_persistent_state_t)', 'registry_entries_blob':'sizeof(s_registry_persistent_io)', 'registry_membership':'sizeof(node_registry_membership_record_t)', 'registry_membership_align':'_Alignof(node_registry_membership_record_t)', 'registry_membership_blob':'sizeof(s_membership)', 'registry_count':'NODE_REGISTRY_MAX_NODES'},
@@ -69,7 +79,7 @@ def main():
  assert results['registry_membership_blob']==results['registry_membership']*results['registry_count']
  wifi_source=GATEWAY/'components/gateway_wifi_foundation/wifi_store.c'
  wifi_adapter=GATEWAY/'components/gateway_wifi_foundation/wifi_store_nvs.c'
- assert run(['git','-C',str(GATEWAY),'rev-parse','HEAD'])=='ecc083dfa7a01590ba2d2190b7bf5369d0022a04', 'gateway revision mismatch'
+ verify_gateway_source()
  assert not run(['git','-C',str(GATEWAY),'status','--porcelain','--',str(wifi_source),str(wifi_adapter),str(wifi_source.with_suffix('.h'))]), 'gateway storage modified'
  assert 'size_t len=16u+c->ssid_len+c->secret_len' in wifi_source.read_text()
  assert 'nvs_set_blob(a->handle,keys[slot],p,n)' in wifi_adapter.read_text()
