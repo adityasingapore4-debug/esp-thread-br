@@ -96,7 +96,7 @@
       "invariant": "conflict cannot invent authority",
       "nvs_state": "equal generations with different payloads",
       "objective": "Conflicting equal generations",
-      "observable": "conflict reported",
+      "observable": "scan fails; no authoritative record selected",
       "occupancy_profile": "GATEWAY_WIFI_AB",
       "prohibition_reason": "No fixture authorization, real NVS or power interruption in M4.2B.3B",
       "record_size_evidence": "fixed ABI wifi_min/wifi_max; occupancy_model.evidence",
@@ -775,10 +775,10 @@
       "executable_in_m4_2b_3b": true,
       "fault_point": null,
       "id": "NO_AUTH",
-      "invariant": "no storage admission",
-      "nvs_state": "mock authorization absent",
-      "objective": "Reject missing authorization",
-      "observable": "denied",
+      "invariant": "fixture preflight never grants BLE Local or ADR-073 Admin authority",
+      "nvs_state": "mock trusted fixture approval absent",
+      "objective": "Reject missing fixture preflight approval",
+      "observable": "fixture preflight denied; Wi-Fi Admin authorization not tested",
       "occupancy_profile": "EMPTY",
       "prohibition_reason": null,
       "record_size_evidence": "fixed ABI wifi_min/wifi_max; occupancy_model.evidence",
@@ -790,7 +790,7 @@
         "v5.5.2",
         "v5.5.4"
       ],
-      "sequence": "evaluate fixture guard"
+      "sequence": "evaluate fixture guard without an approved fixture"
     },
     {
       "classification": "OFFLINE_HOST_EXECUTABLE",
@@ -880,5 +880,9 @@
     }
   ],
   "catalog_version": "1.0",
+  "field_semantics": {
+    "nvs_state": "Required record-presence, validity, generation and other state conditions for future fixture construction. This case contract, not occupancy_profile, governs setup; no NVS image is generated here.",
+    "occupancy_profile": "Analytical capacity-demand reference only. It is not an exact NVS fixture recipe, a record-presence assertion, or proof that an NVS write is admissible."
+  },
   "source_revision": "8720847e1f62b2001a93a3ac436491671404bf77"
 }

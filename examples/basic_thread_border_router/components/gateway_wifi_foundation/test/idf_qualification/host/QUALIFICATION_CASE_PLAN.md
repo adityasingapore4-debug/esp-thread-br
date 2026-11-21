@@ -15,6 +15,29 @@ configurations with three bonds, eight CCCDs, host privacy disabled and
 advertising encryption disabled are supported. No runtime override enables a
 future case. A caller-provided catalog must equal the canonical catalog.
 
+## Case semantics and authority boundaries
+
+`occupancy_profile` is an analytical capacity-demand reference, **not** an
+NVS-image recipe or a requirement that every listed key exists in the case.
+`nvs_state` is the case-specific future fixture-state contract: required
+record presence, validity and generation. Thus `SINGLE_A` and `SINGLE_B`
+each require only one valid committed slot even though both reference the
+`GATEWAY_WIFI_AB` capacity model, which counts two slots. The catalog makes
+these meanings explicit in its top-level `field_semantics` object. No fixture
+state, NVS image or flash contents are constructed by M4.2B.3B.
+
+`DUAL_EQUAL` means two different valid configurations with the same
+generation: the accepted storage scan **fails without selecting an
+authoritative record**. It does not emit a dedicated conflict diagnostic, so
+none is required by this catalog case.
+
+The historical case ID `NO_AUTH` tests **missing trusted fixture preflight
+approval** only. The fixture guard is not BLE Local authentication or fresh,
+one-use ADR-073 Admin authorization. Passing any fixture guard check never
+grants Wi-Fi configuration authority. Gateway Wi-Fi Local/Admin admission and
+same-connection proof remain separately gated; no M4W.3 behavior is exercised
+or accepted by these case definitions.
+
 ## Source-backed contracts and empirical limits
 
 * `wifi_store.c` validates records and slot generations; after an attempted

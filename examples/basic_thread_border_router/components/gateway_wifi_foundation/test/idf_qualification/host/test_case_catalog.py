@@ -27,6 +27,30 @@ class CatalogTests(unittest.TestCase):
    self.assertEqual(c['executable_in_m4_2b_3b'],c['classification']==catalog.OFFLINE)
    self.assertEqual(c['requires_hardware'],c['classification']!=catalog.OFFLINE)
    if c['classification']!=catalog.OFFLINE: self.assertTrue(c['prohibition_reason'])
+ def test_case_contracts_and_authority_boundaries(self):
+  data=catalog.catalog()
+  self.assertEqual(data['field_semantics'],catalog.FIELD_SEMANTICS)
+  self.assertIn('capacity-demand reference',data['field_semantics']['occupancy_profile'])
+  self.assertIn('not an exact NVS fixture recipe',data['field_semantics']['occupancy_profile'])
+  self.assertIn('governs setup',data['field_semantics']['nvs_state'])
+  cases={case['id']:case for case in data['cases']}
+  self.assertEqual(len(cases),40)
+  for cls,expected in [(catalog.OFFLINE,12),(catalog.NVS,18),(catalog.POWER,7),(catalog.BLOCKED,3)]:
+   self.assertEqual(sum(1 for case in cases.values() if case['classification']==cls),expected)
+  equal=cases['DUAL_EQUAL']
+  self.assertEqual(equal['observable'],'scan fails; no authoritative record selected')
+  self.assertEqual(equal['classification'],catalog.NVS)
+  no_auth=cases['NO_AUTH']
+  self.assertIn('fixture preflight',no_auth['objective'])
+  self.assertIn('fixture guard',no_auth['sequence'])
+  self.assertIn('never grants BLE Local or ADR-073 Admin authority',no_auth['invariant'])
+  self.assertIn('Wi-Fi Admin authorization not tested',no_auth['observable'])
+  self.assertEqual(no_auth['classification'],catalog.OFFLINE)
+  for single in ('SINGLE_A','SINGLE_B'):
+   self.assertEqual(cases[single]['occupancy_profile'],'GATEWAY_WIFI_AB')
+   self.assertIn('only',cases[single]['nvs_state'])
+  self.assertFalse(any(case['executable_in_m4_2b_3b'] for case in cases.values() if case['classification']!=catalog.OFFLINE))
+
  def test_source_backed_sizes_and_configs(self):
   for sdk in ('v5.5.2','v5.5.4'):
    fixed,nim=occupancy.evidence(sdk,catalog.FEATURES)

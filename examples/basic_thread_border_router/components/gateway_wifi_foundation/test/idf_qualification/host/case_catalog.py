@@ -7,6 +7,10 @@ from pathlib import Path
 import occupancy_model as occupancy
 
 VERSION = '1.0'
+FIELD_SEMANTICS = {
+ 'occupancy_profile': "Analytical capacity-demand reference only. It is not an exact NVS fixture recipe, a record-presence assertion, or proof that an NVS write is admissible.",
+ 'nvs_state': "Required record-presence, validity, generation and other state conditions for future fixture construction. This case contract, not occupancy_profile, governs setup; no NVS image is generated here.",
+}
 HERE = Path(__file__).resolve().parent
 OFFLINE = 'OFFLINE_HOST_EXECUTABLE'
 NVS = 'FUTURE_ISOLATED_NVS_REQUIRED'
@@ -20,7 +24,7 @@ ROWS = [
  ('SINGLE_A', 'Single valid A', 'GATEWAY_WIFI_AB', 'valid A only', 'scan A and B', 'only valid record may be selected', 'A generation selected', NVS, None),
  ('SINGLE_B', 'Single valid B', 'GATEWAY_WIFI_AB', 'valid B only', 'scan A and B', 'only valid record may be selected', 'B generation selected', NVS, None),
  ('DUAL_ORDER', 'Dual records generation ordering', 'GATEWAY_WIFI_AB', 'two valid unequal generations', 'scan both slots', 'highest valid generation wins', 'higher generation selected', NVS, None),
- ('DUAL_EQUAL', 'Conflicting equal generations', 'GATEWAY_WIFI_AB', 'equal generations with different payloads', 'scan both slots', 'conflict cannot invent authority', 'conflict reported', NVS, None),
+ ('DUAL_EQUAL', 'Conflicting equal generations', 'GATEWAY_WIFI_AB', 'equal generations with different payloads', 'scan both slots', 'conflict cannot invent authority', 'scan fails; no authoritative record selected', NVS, None),
  ('BAD_CRC', 'CRC corruption', 'GATEWAY_WIFI_AB', 'one bad checksum and one valid record', 'scan both slots', 'corrupt candidate cannot become authority', 'valid record selected or fail closed', NVS, None),
  ('BAD_LENGTH', 'Malformed record length', 'GATEWAY_WIFI_AB', 'one malformed length', 'scan both slots', 'invalid length is rejected', 'invalid record rejected', NVS, None),
  ('BAD_SCHEMA', 'Invalid record schema', 'GATEWAY_WIFI_AB', 'one unsupported schema', 'scan both slots', 'unsupported schema cannot become authority', 'invalid record rejected', NVS, None),
@@ -51,7 +55,7 @@ ROWS = [
  ('NO_ENROLLMENT', 'Reject missing enrollment', 'EMPTY', 'immutable empty allowlist', 'evaluate fixture guard', 'default admission denied', 'denied', OFFLINE, None),
  ('WRONG_PARTITION', 'Reject wrong partition', 'EMPTY', 'mock partition mismatch', 'evaluate fixture guard', 'no storage admission', 'denied', OFFLINE, None),
  ('WRONG_APP', 'Reject wrong application identity', 'EMPTY', 'mock app mismatch', 'evaluate fixture guard', 'no storage admission', 'denied', OFFLINE, None),
- ('NO_AUTH', 'Reject missing authorization', 'EMPTY', 'mock authorization absent', 'evaluate fixture guard', 'no storage admission', 'denied', OFFLINE, None),
+ ('NO_AUTH', 'Reject missing fixture preflight approval', 'EMPTY', 'mock trusted fixture approval absent', 'evaluate fixture guard without an approved fixture', 'fixture preflight never grants BLE Local or ADR-073 Admin authority', 'fixture preflight denied; Wi-Fi Admin authorization not tested', OFFLINE, None),
  ('PRODUCTION_DENY', 'Prohibit production execution', 'EMPTY', 'production or unknown target', 'evaluate selection and isolation', 'no production execution path', 'denied', OFFLINE, None),
  ('SYNTHETIC_SECRET', 'Synthetic credentials and retirement', 'EMPTY', 'mock synthetic credentials', 'run mock worker; inspect retirement and output', 'credential bytes not logged or retained', 'zeroized candidate; no credential output', OFFLINE, None),
  ('SDK_552', 'Qualify v5.5.2 separately', 'NORMAL_INSTALLATION', 'v5.5.2 fixture prerequisites verified', 'prepare isolated fixture and measure', 'evidence is version specific', 'v5.5.2 observations recorded', NVS, None),
@@ -69,7 +73,7 @@ def catalog():
    'requires_hardware':cls!=OFFLINE,'executable_in_m4_2b_3b':cls==OFFLINE,
    'prohibition_reason':None if cls==OFFLINE else 'No fixture authorization, real NVS or power interruption in M4.2B.3B',
    'record_size_evidence':'fixed ABI wifi_min/wifi_max; occupancy_model.evidence'})
- return {'catalog_version':VERSION,'source_revision':occupancy.PIN,'cases':cases}
+ return {'catalog_version':VERSION,'source_revision':occupancy.PIN,'field_semantics':FIELD_SEMANTICS,'cases':cases}
 
 def required_evidence(sdk):
  fixed,nim=occupancy.evidence(sdk,FEATURES)
