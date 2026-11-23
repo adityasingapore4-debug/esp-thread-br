@@ -57,8 +57,12 @@ or accepted by these case definitions.
   occupancy. High pressure and exhaustion remain blocked as fixture prerequisites.
   Actual writes, torn records, page transitions and interruption timing require
   separate empirical qualification. Cross-version NVS-image compatibility is
-  not established. ESP-IDF v5.5.4 inert compilation remains unverified due to its
-  documented `stdatomic.h` / `-pedantic -Werror` diagnostic.
+  not established. After the host-only CMake warning-policy correction in commit
+  `4a5b868adbd58dabba22665262226e101c07a9cf`, the operator reported successful
+  isolated compile-only builds with ESP-IDF v5.5.2 and v5.5.4; full build logs
+  were not independently reviewed here. This is not real-NVS, hardware, or
+  cross-version NVS-image compatibility evidence. The `SDK_554` hardware case
+  remains blocked until its separately scoped prerequisites are satisfied.
 
 ## Prerequisites for a future independently authorized milestone
 
