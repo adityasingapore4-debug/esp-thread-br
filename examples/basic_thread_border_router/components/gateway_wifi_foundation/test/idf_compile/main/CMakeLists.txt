@@ -4,7 +4,10 @@ idf_component_register(
     INCLUDE_DIRS "../../.."
     REQUIRES nvs_flash)
 target_compile_options(${COMPONENT_LIB} PRIVATE -std=c11 -Wall -Wextra -Werror)
-# IDF newlib uses #include_next, which rejects -pedantic in the NVS adapter.
-# Keep the portable core pedantic; compile the adapter against real SDK headers.
+# The SDK newlib stdatomic.h uses GCC #include_next. With -Werror,
+# -pedantic makes the accepted wifi_recovery.c fail against ESP-IDF v5.5.4.
+# Keep -pedantic for portable core units; recovery still uses -Wall/-Wextra/
+# -Werror here and retains -pedantic in the separate strict-C11 host tests.
+# The real NVS adapter remains compiled without -pedantic as before.
 set_source_files_properties("../../../wifi_codec.c" "../../../wifi_transaction.c"
-    "../../../wifi_store.c" "../../../wifi_recovery.c" PROPERTIES COMPILE_OPTIONS "-pedantic")
+    "../../../wifi_store.c" PROPERTIES COMPILE_OPTIONS "-pedantic")
