@@ -78,6 +78,7 @@ static void worker_running_restart(void)
     CHECK(!pthread_mutex_unlock(&gate.mutex));
     wifi_recovery_request_restart(&c); wifi_recovery_poll(&c);
     CHECK(!wifi_recovery_status(&c).quiescent && !wifi_recovery_status(&c).candidate_retired);
+    wifi_storage_job_t premature; CHECK(!wifi_recovery_job(&c,&premature));
     CHECK(!qual_worker_submit(&worker,&job)); CHECK(tx.state==WIFI_TX_COMMITTING);
     CHECK(!pthread_mutex_lock(&gate.mutex)); gate.release=true; CHECK(!pthread_cond_signal(&gate.cond));
     CHECK(!pthread_mutex_unlock(&gate.mutex));
@@ -172,6 +173,9 @@ static void worker_elapsed_budget(void)
     CHECK(qual_worker_stop(&worker));
     puts("synthetic elapsed budget fences queued worker: PASS");
 }
+#ifdef QUAL_CASE_DRIVER
+#define main worker_regression_main
+#endif
 int main(void)
 {
     worker_normal_and_identity(); worker_queued_restart(); worker_running_restart(); worker_stop_pending(); worker_stop_running(); worker_uncertainty_and_budget(); worker_elapsed_budget();

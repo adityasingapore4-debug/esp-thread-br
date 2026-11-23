@@ -26,10 +26,14 @@ repo = Path(subprocess.check_output(["git", "-C", str(project), "rev-parse", "--
 allowed = project.relative_to(repo).as_posix() + "/"
 baseline = "ecc083dfa7a01590ba2d2190b7bf5369d0022a04"
 review = "10367ab83b46ab98150252453f06fdc9b6f1da61"
+accepted_m42c = "4a5b868adbd58dabba22665262226e101c07a9cf"
+accepted_compile_policy = "examples/basic_thread_border_router/components/gateway_wifi_foundation/test/idf_compile/main/CMakeLists.txt"
 subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", baseline, review], check=True)
-subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", review, "HEAD"], check=True)
+subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", review, accepted_m42c], check=True)
+subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", accepted_m42c, "HEAD"], check=True)
 committed = subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", baseline, "HEAD"], text=True).splitlines()
-assert committed and all(path.startswith(allowed) for path in committed), committed
+assert committed and all(path.startswith(allowed) or path == accepted_compile_policy for path in committed), committed
+assert not subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", accepted_m42c, "HEAD", "--", accepted_compile_policy], text=True).strip()
 changed = subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", "HEAD"], text=True).splitlines()
 new = subprocess.check_output(["git", "-C", str(repo), "ls-files", "--others", "--exclude-standard"], text=True).splitlines()
 assert all(path.startswith(allowed) for path in changed + new), (changed, new)
