@@ -15,6 +15,15 @@ config UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
         this starts the existing engineering Gateway HTTP carrier and OTBR
         runtime; that is outside the G1A profile.
 
+config UN_GATEWAY_DEV_WIFI_SYNTHETIC_SELFTEST
+    bool "Run synthetic Gateway Wi-Fi owner self-test (development only)"
+    depends on !UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC
+    default n
+    help
+        Runs one RAM-only fixed-fixture self-test after normal Gateway startup.
+        No Wi-Fi driver, NVS, transport or authorization integration is added.
+        This test must not be enabled in a release configuration.
+
 config UN_GATEWAY_DEV_P4_AUTH_PREPARE
     bool "Prepare P4 Local authentication runtime (development only)"
     depends on !UN_GATEWAY_G1A_ENABLE_PRODUCT_TRAFFIC

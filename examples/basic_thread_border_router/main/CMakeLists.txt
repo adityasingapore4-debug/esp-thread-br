@@ -12,3 +12,9 @@ endif()
 if(CONFIG_UN_GATEWAY_DEV_PSRAM)
     idf_component_optional_requires(PRIVATE esp_psram esp_https_server)
 endif()
+
+# Development-only self-test component has no external ingress.
+if(CONFIG_UN_GATEWAY_DEV_WIFI_SYNTHETIC_SELFTEST)
+    idf_component_optional_requires(PRIVATE gateway_wifi_synthetic_selftest)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE ADR091_SYNTHETIC_RUNTIME_SELFTEST=1)
+endif()

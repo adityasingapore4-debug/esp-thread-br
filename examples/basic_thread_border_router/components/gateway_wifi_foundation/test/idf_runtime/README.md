@@ -8,7 +8,7 @@ The test checks initial synthetic status, a scan response, FIFO capacity, valida
 
 ## Resources and validation
 
-On the compiled ESP32-S3 image, `xtensa-esp32s3-elf-nm -S` reports 1,088 bytes for the static synthetic owner including the eight-entry queue and two in-memory slots. One temporary task requests 6,144 bytes of stack plus FreeRTOS task bookkeeping. The device prints actual stack high-water bytes; this has not yet been observed on hardware. The project boot stack and ESP-IDF system memory are additional. Host ABI gives a different structure size and its fake high-water number is not a target measurement.
+The ESP32-S3 synthetic owner occupies 1,088 bytes, including the eight-entry queue and two in-memory slots; the task now allocates this owner at startup, wipes it and frees it on exit. One temporary task requests 6,144 bytes of stack plus FreeRTOS task bookkeeping. The device prints actual stack high-water bytes; this has not yet been observed on hardware. The project boot stack and ESP-IDF system memory are additional. Host ABI gives a different structure size and its fake high-water number is not a target measurement.
 
 From the Gateway example directory:
 

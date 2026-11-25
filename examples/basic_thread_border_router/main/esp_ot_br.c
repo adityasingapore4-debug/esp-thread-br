@@ -8,6 +8,10 @@
 
 #include "sdkconfig.h"
 
+#if CONFIG_UN_GATEWAY_DEV_WIFI_SYNTHETIC_SELFTEST
+#include "runtime_owner.h"
+#endif
+
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -321,4 +325,11 @@ void app_main(void)
     ESP_LOGI(TAG, "G1E provisioning and Registry Sync composition ready; Gateway HTTP/LAN disabled");
 #endif
 #endif
+#if CONFIG_UN_GATEWAY_DEV_WIFI_SYNTHETIC_SELFTEST
+    /* Self-test failure is diagnostic and must not stop the Gateway. */
+    if (!adr091_synthetic_owner_start()) {
+        ESP_LOGE(TAG, "ADR091_RUNTIME_SELFTEST: FAIL task creation");
+    }
+#endif
+
 }
