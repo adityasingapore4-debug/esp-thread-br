@@ -9,3 +9,7 @@ Against Gateway baseline `dea252fe6a5f2018bcb8b2403a223e5a1d3dc919` and firmware
 ## M4W.3C standalone host composition — 2026-11-25
 
 An offline-only, compile-guarded service composition now lives under `components/gateway_wifi_foundation/test/standalone`. It composes the existing codec, transaction, storage and recovery foundations with synthetic in-memory storage, clock, scan and events. Seven new service cases passed normally, under ASan and under UBSan; the existing storage/foundation regression script also passed. This is host qualification, not registration, runtime firmware integration, or evidence of real association or persistent storage. The M4W.3B authorization and ordered carrier-loss handoff blocker remains open. See the standalone README for exact commands and boundaries.
+
+## M4W.3C isolated ESP-IDF synthetic owner — 2026-11-25
+
+The separate `gateway_wifi_foundation/test/idf_runtime` development project now composes the qualified foundations in a single synthetic FreeRTOS owner with a bounded internal FIFO and ESP-IDF monotonic clock. It has no communication ingress, actual Wi-Fi, production NVS or authorization integration and is not registered in the Gateway application. The host-shim self-test, ASan and UBSan passed; offline fixture and storage regressions passed. An isolated ESP32-S3 self-test image built at `0x30f40` with `0xcf0c0` free in its own default app partition. No hardware was flashed or tested. See its README for exact scope, resources and hardware procedure. The M4W.3B blocker and production gates remain open.
